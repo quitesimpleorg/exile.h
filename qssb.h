@@ -156,7 +156,7 @@ static int mount_to_chroot(const char *chroot_target_path, char **paths, unsigne
 /* TODO: can this function do actually anything useful?*/
 static int qssb_end_policy(struct qssb_policy *ctxt)
 {
-
+	return 0;
 }
 
 /*
@@ -357,7 +357,11 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->drop_caps)
 	{
-		drop_caps();
+		if(drop_caps() < 0)
+		{
+			QSSB_LOG_ERROR("failed to drop capabilities\n");
+			return -1;
+		}
 	}
 
 	if(policy->not_dumpable)
