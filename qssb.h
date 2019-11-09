@@ -1,6 +1,10 @@
 #ifndef QSSB_H
 #define QSSB_H
+
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
+
 #include <sched.h>
 #include <stdio.h>
 #include <errno.h>
@@ -32,7 +36,9 @@
 
 #define QSSB_ISOLATE_NETWORK 1<<1
 
+#ifndef QSSB_LOG_ERROR
 #define QSSB_LOG_ERROR(...) fprintf(stderr, __VA_ARGS__)
+#endif
 
 /* Policy tells qssb what to do */
 struct qssb_policy
