@@ -333,12 +333,12 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->readonly_paths != NULL || policy->writable_paths != NULL)
 	{
-		if(mount_to_chroot(policy->chroot_target_path, policy->readonly_paths,  MS_BIND | MS_RDONLY) < 0)
+		if(mount_to_chroot(policy->chroot_target_path, policy->readonly_paths,  MS_BIND | MS_RDONLY | MS_REC) < 0)
 		{
 			return -1;
 		}
 
-		if(mount_to_chroot(policy->chroot_target_path, policy->writable_paths,  MS_BIND) < 0)
+		if(mount_to_chroot(policy->chroot_target_path, policy->writable_paths,  MS_BIND | MS_REC) < 0)
 		{
 			return -1;
 		}
