@@ -34,7 +34,9 @@
 	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, \
 		 offsetof(struct seccomp_data, nr))
 
-#define QSSB_ISOLATE_NETWORK 1<<1
+#define QSSB_UNSHARE_NETWORK 1<<1
+#define QSSB_UNSHARE_USER 1<<2
+#define QSSB_UNSHARE_MOUNT 1<<3
 
 #ifndef QSSB_LOG_ERROR
 #define QSSB_LOG_ERROR(...) fprintf(stderr, __VA_ARGS__)
@@ -67,7 +69,7 @@ struct qssb_policy *qssb_init_policy()
 	result->drop_caps = 1;
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
-	result->namespace_options = 0;
+	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
 	result->chdir_path = "/";
 	result->chroot_target_path = NULL;
 	result->readonly_paths = NULL;
@@ -173,37 +175,53 @@ static void qssb_free_policy(struct qssb_policy *ctxt)
 	free(ctxt);
 }
 
-/* Enters the user and mount namespaces */
-static int enter_namespaces()
+/* Enters the specified namespaces */
+static int enter_namespaces(int namespace_options)
 {
-	int ret = unshare(CLONE_NEWUSER);
-	if(ret == -1)
+	if(namespace_options & QSSB_UNSHARE_USER)
 	{
-		QSSB_LOG_ERROR("Error: Failed to unshare user namespaces: %s\n", strerror(errno));
-		return ret;
+		int ret = unshare(CLONE_NEWUSER);
+		if(ret == -1)
+		{
+			QSSB_LOG_ERROR("Error: Failed to unshare user namespaces: %s\n", strerror(errno));
+			return ret;
+		}
+
+		uid_t current_uid = getuid();
+		gid_t current_gid = getgid();
+
+		//TODO: check errors
+		FILE *fp = fopen("/proc/self/setgroups", "w");
+		fprintf(fp, "deny");
+		fclose(fp);
+
+		fp = fopen("/proc/self/uid_map", "w");
+		fprintf(fp, "0 %i", current_uid);
+		fclose(fp); 
+
+		fp = fopen("/proc/self/gid_map", "w");
+		fprintf(fp, "0 %i", current_gid);
+		fclose(fp);
 	}
 
-	uid_t current_uid = getuid();
-	gid_t current_gid = getgid();
-
-	//TODO: check errors
-	FILE *fp = fopen("/proc/self/setgroups", "w");
-	fprintf(fp, "deny");
-	fclose(fp);
-
-	fp = fopen("/proc/self/uid_map", "w");
-	fprintf(fp, "0 %i", current_uid);
-	fclose(fp); 
-
-	fp = fopen("/proc/self/gid_map", "w");
-	fprintf(fp, "0 %i", current_gid);
-	fclose(fp);
-
-	ret = unshare(CLONE_NEWNS);
-	if(ret == -1)
+	if(namespace_options & QSSB_UNSHARE_MOUNT)
 	{
-		QSSB_LOG_ERROR("Error: Failed to unshare mount namespaces: %s\n", strerror(errno));
-		return ret;
+		int ret = unshare(CLONE_NEWNS);
+		if(ret == -1)
+		{
+			QSSB_LOG_ERROR("Error: Failed to unshare mount namespaces: %s\n", strerror(errno));
+			return ret;
+		}
+	}
+
+	if(namespace_options & QSSB_UNSHARE_NETWORK)
+	{
+		int ret = unshare(CLONE_NEWNET);
+		if(ret == -1)
+		{
+			QSSB_LOG_ERROR("Error: Failed to unshare network namespace: %s\n", strerror(errno));
+			return ret;
+		}
 	}
 
 	return 0;	
@@ -331,7 +349,7 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		policy->chroot_target_path = "/tmp/.TODOIMPLEMENT"; //TODO: implement
 	}
 
-	if(enter_namespaces() < 0)
+	if(enter_namespaces(policy->namespace_options) < 0)
 	{
 		QSSB_LOG_ERROR("Error while trying to enter namespaces\n");
 		return -1;
