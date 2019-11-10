@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/mount.h>
 #include <sys/prctl.h>
+#include <sys/random.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -21,7 +22,7 @@
 #include <linux/seccomp.h>
 #include <sys/capability.h>
 #include <stddef.h>
-
+#include <inttypes.h>
 //TODO: stolen from kernel samples/seccomp, GPLv2...?
 #define ALLOW \
 	BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
@@ -40,6 +41,10 @@
 
 #ifndef QSSB_LOG_ERROR
 #define QSSB_LOG_ERROR(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
+#ifndef QSSB_TEMP_DIR
+#define QSSB_TEMP_DIR "/tmp"
 #endif
 
 /* Policy tells qssb what to do */
@@ -77,6 +82,29 @@ struct qssb_policy *qssb_init_policy()
 	return result;
 }
 
+
+/*
+ * Fills buffer with random characters a-z.
+ * The string will be null terminated.
+ *
+ * @returns: number of written chars (excluding terminating null byte) on success
+ */
+int random_string(char *buffer, size_t buffer_length)
+{
+	int r = getrandom(buffer, buffer_length-1, GRND_NONBLOCK);
+	if(r != -1 && (size_t) r == buffer_length-1)
+	{
+		int i = 0;
+		while(i < r)
+		{
+			buffer[i] = 'a' + ((unsigned int)buffer[i] % 26);
+			++i;
+		}
+		buffer[buffer_length-1] = '\0';
+		return i;
+	}
+	return 0;
+}
 
 
 /* Creates a directory and all necessary parent directories 
@@ -346,7 +374,18 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->chroot_target_path == NULL)
 	{
-		policy->chroot_target_path = "/tmp/.TODOIMPLEMENT"; //TODO: implement
+		char target_dir[PATH_MAX];
+		char random_str[17];
+		if(random_string(random_str, sizeof(random_str)) == 16)
+		{
+			snprintf(target_dir, sizeof(target_dir), "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
+			policy->chroot_target_path = target_dir;
+		}
+		else
+		{
+			QSSB_LOG_ERROR("Error creating random sandbox directory name\n");
+			return -1;
+		}
 	}
 
 	if(enter_namespaces(policy->namespace_options) < 0)
