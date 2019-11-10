@@ -320,7 +320,7 @@ static int seccomp_enable(int *syscalls, int per_syscall, int default_action)
 		++syscalls;
 	}
 
-	struct sock_filter da = BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL);
+	struct sock_filter da = BPF_STMT(BPF_RET+BPF_K, default_action);
 	filter[current_filter_index] = da;
 	
 	struct sock_fprog prog = {
