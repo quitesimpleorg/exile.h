@@ -113,7 +113,7 @@ int random_string(char *buffer, size_t buffer_length)
  * */
 static int mkdir_structure(const char *p, mode_t mode)
 {
-	char path[PATH_MAX + 2] = { 0 };
+	char path[PATH_MAX] = { 0 };
 	snprintf(path, sizeof(path), "%s/", p);
 
 	char *begin = path;
@@ -166,7 +166,7 @@ static int mount_to_chroot(const char *chroot_target_path, char **paths, unsigne
 	char *path = *paths;
 	while(path != NULL)
 	{
-		char path_inside_chroot[PATH_MAX + 1];
+		char path_inside_chroot[PATH_MAX];
 		snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path);
 		int ret = mkdir_structure(path_inside_chroot, 0700);
 		if(ret < 0)
