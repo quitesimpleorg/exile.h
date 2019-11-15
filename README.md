@@ -1,10 +1,13 @@
-qssb (quite simple sandbox)
-===========================
-qssb.h is a simple header only library for easy sandboxing of
-applications.
+qssb.h (quite simple sandbox)
+=============================
+qssb.h is a simple header only library that provides an interface
+to sandbox applications. Using Seccomp and Linux Namespaces for that
+purpose requires some knowledge of annoying details which this library
+aims to abstract away as much as possible.
 
-It aims to provide an interface to avoid the annoying details that
-using Seccomp and Linux Namespaces requires.
+Status
+======
+No release yet, API is unstable.
 
 Features
 ========
@@ -13,11 +16,25 @@ privileges, isolating the application from the network, etc.
 
 Requirements
 ============
-Kernel x.y.z.
+Kernel >=3.17
+sys/capabilities.h header. Depending on your system, libcap
+might be needed for this.
 
-Status
-======
-No release yet, API is unstable.
+
+
+FAQ
+===
+
+Does the process need to be priviliged to utilize the library?
+----------------------------------------------------------------
+No.
+
+It doesn't work on Debian!
+--------------------------
+You can thank a Debian-specific patch for that. In the future,
+the library may check against that. Execute
+echo 1 > /proc/sys/kernel/unprivileged_userns_clone to disable that
+patch for now.
 
 Documentation
 =============
@@ -30,7 +47,7 @@ Real world project: cgit sandboxed: https://git.quitesimple.org/cgitsb
 
 Contributing
 ============
-Contributations are very welcome. Options: 
+Contributions are very welcome. Options: 
 1) Pull-Request: github.com/quitesimpleorg/qssb 
 2) Mail to qssb at quitesimple.org with instructions
 on where to pull the changes.

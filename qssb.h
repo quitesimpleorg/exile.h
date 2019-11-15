@@ -140,7 +140,18 @@ int random_string(char *buffer, size_t buffer_length)
 static int mkdir_structure(const char *p, mode_t mode)
 {
 	char path[PATH_MAX] = { 0 };
-	snprintf(path, sizeof(path), "%s/", p);
+	int res = snprintf(path, sizeof(path), "%s/", p);
+	if(res < 0)
+	{
+		QSSB_LOG_ERROR("qssb: mkdir_strucutre: error during path concatination\n");
+		return -EINVAL;
+	}
+	if(res >= PATH_MAX)
+	{
+		QSSB_LOG_ERROR("qssb: mkdir_structure: path concatination truncated\n");
+		return -EINVAL;
+	}
+
 
 	char *begin = path;
 	char *end = begin+1;
@@ -193,7 +204,17 @@ static int mount_to_chroot(const char *chroot_target_path, char **paths, unsigne
 	while(path != NULL)
 	{
 		char path_inside_chroot[PATH_MAX];
-		snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path);
+		int written = snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path);
+		if(written < 0)
+		{
+			QSSB_LOG_ERROR("qssb: mount_to_chroot: Error during path concatination\n");
+			return -EINVAL;
+		}
+		if(written >= PATH_MAX)
+		{
+			QSSB_LOG_ERROR("qssb: mount_to_chroot: path concatination truncated\n");
+			return -EINVAL;
+		}
 		int ret = mkdir_structure(path_inside_chroot, 0700);
 		if(ret < 0)
 		{
@@ -404,7 +425,17 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		char random_str[17];
 		if(random_string(random_str, sizeof(random_str)) == 16)
 		{
-			snprintf(target_dir, sizeof(target_dir), "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
+			int res = snprintf(target_dir, sizeof(target_dir), "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
+			if(res < 0)
+			{
+				QSSB_LOG_ERROR("qssb: qssb_enable_policy: error during path concatination\n");
+				return -EINVAL;
+			}
+			if(res >= PATH_MAX)
+			{
+				QSSB_LOG_ERROR("qssb: qssb_enable_policy: path concatination truncated\n");
+				return -EINVAL;
+			}
 			policy->chroot_target_path = target_dir;
 		}
 		else
