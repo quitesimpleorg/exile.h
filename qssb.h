@@ -95,7 +95,7 @@ struct qssb_policy
  * @returns: default policy */
 struct qssb_policy *qssb_init_policy()
 {
-	struct qssb_policy *result = calloc(1, sizeof(struct qssb_policy));
+	struct qssb_policy *result = (struct qssb_policy *) calloc(1, sizeof(struct qssb_policy));
 	result->blacklisted_syscalls = default_blacklisted_syscals;
 	result->drop_caps = 1;
 	result->not_dumpable = 1;
