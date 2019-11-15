@@ -23,6 +23,8 @@
 #include <sys/capability.h>
 #include <stddef.h>
 #include <inttypes.h>
+#include <asm/unistd.h>
+
 //TODO: stolen from kernel samples/seccomp, GPLv2...?
 #define ALLOW \
 	BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
@@ -46,6 +48,29 @@
 #ifndef QSSB_TEMP_DIR
 #define QSSB_TEMP_DIR "/tmp"
 #endif
+
+#define QSSB_SYS(x)		(__NR_##x)
+
+
+/* Most exploits have more need for those syscalls than the
+ * exploited programs. In cases they are needed, this list should be
+ * filtered or simply not used.
+ */
+ /* TODO: more execv* in some architectures */
+ /* TODO: add more */
+static int default_blacklisted_syscals[] = {
+	QSSB_SYS(setuid),
+	QSSB_SYS(setgid),
+	QSSB_SYS(chroot),
+	QSSB_SYS(pivot_root),
+	QSSB_SYS(mount),
+	QSSB_SYS(setns),
+	QSSB_SYS(unshare),
+	QSSB_SYS(ptrace),
+	QSSB_SYS(personality),
+	QSSB_SYS(execve),
+	-1
+};
 
 /* Policy tells qssb what to do */
 struct qssb_policy
@@ -71,6 +96,7 @@ struct qssb_policy
 struct qssb_policy *qssb_init_policy()
 {
 	struct qssb_policy *result = calloc(1, sizeof(struct qssb_policy));
+	result->blacklisted_syscalls = default_blacklisted_syscals;
 	result->drop_caps = 1;
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
