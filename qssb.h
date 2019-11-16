@@ -51,6 +51,17 @@
 
 #define QSSB_SYS(x)		(__NR_##x)
 
+//TODO: implement
+#define QSSB_MOUNT_ALLOW_NOTHING 0 //explicit rule
+
+#define QSSB_MOUNT_ALLOW_READ 1<<0
+#define QSSB_MOUNT_ALLOW_WRITE (1<<1) | QSSB_MOUNT_ALLOW_READ
+#define QSSB_MOUNT_ALLOW_EXEC 1<<2
+#define QSSB_MOUNT_ALLOW_DEV 1<<3
+#define QSSB_MOUNT_ALLOW_SETUID 1<<4
+//don't mount recursive
+#define QSSB_MOUNT_NOT_REC 1<<5
+
 
 /* Most exploits have more need for those syscalls than the
  * exploited programs. In cases they are needed, this list should be
@@ -72,6 +83,14 @@ static int default_blacklisted_syscals[] = {
 	-1
 };
 
+struct qssb_path_policy
+{
+	const char *mountpoint;
+	int policy;
+	struct qssb_path_policy *next;
+};
+
+
 /* Policy tells qssb what to do */
 struct qssb_policy
 {
@@ -85,8 +104,7 @@ struct qssb_policy
 	int *allowed_syscalls;
 	char *chroot_target_path;
 	char *chdir_path;
-	char **readonly_paths;
-	char **writable_paths;
+	struct qssb_path_policy *path_policies;
 };
 
 
@@ -103,8 +121,7 @@ struct qssb_policy *qssb_init_policy()
 	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
 	result->chdir_path = "/";
 	result->chroot_target_path = NULL;
-	result->readonly_paths = NULL;
-	result->writable_paths = NULL;
+	result->path_policies = NULL;
 	return result;
 }
 
@@ -189,22 +206,50 @@ static int mkdir_structure(const char *p, mode_t mode)
 }
 
 
+
+/* @returns: argument for mount(2) flags */
+static int get_policy_mount_flags(struct qssb_path_policy *policy)
+{
+	int result = 0;
+
+	if( (policy->policy & QSSB_MOUNT_ALLOW_DEV) == 0)
+	{
+		result |= MS_NODEV;
+	}
+
+	if( (policy->policy & QSSB_MOUNT_ALLOW_EXEC) == 0)
+	{
+		result |= MS_NOEXEC;
+	}
+
+	if( (policy->policy & QSSB_MOUNT_ALLOW_SETUID) == 0)
+	{
+		result |= MS_NOSUID;
+	}
+
+	if( (policy->policy & QSSB_MOUNT_ALLOW_WRITE) == QSSB_MOUNT_ALLOW_READ)
+	{
+		result |= MS_RDONLY;
+	}
+
+	if( !(policy->policy & QSSB_MOUNT_NOT_REC))
+	{
+		result |= MS_REC;
+	}
+	return result;
+}
+
 /* Helper to mount directories into the chroot path "chroot_target_path"
  * Paths will be created if necessary
  
  * @returns: 0 on sucess, -ERRNO on failure */
-static int mount_to_chroot(const char *chroot_target_path, char **paths, unsigned long flags)
+static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_policy *path_policy)
 {
-	if(paths == NULL)
+	while(path_policy != NULL)
 	{
-		return 0;
-	}
 
-	char *path = *paths;
-	while(path != NULL)
-	{
 		char path_inside_chroot[PATH_MAX];
-		int written = snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path);
+		int written = snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path_policy->mountpoint);
 		if(written < 0)
 		{
 			QSSB_LOG_ERROR("qssb: mount_to_chroot: Error during path concatination\n");
@@ -222,14 +267,30 @@ static int mount_to_chroot(const char *chroot_target_path, char **paths, unsigne
 			return ret;
 		}
 
-		ret = mount(path, path_inside_chroot,  NULL, flags, NULL);
-		if(ret < 0 )
-		{
-			QSSB_LOG_ERROR("Error: Failed to mount %s to %s: %s\n", path, path_inside_chroot, strerror(errno));
-			return ret;
-		}
+		int mount_flags = get_policy_mount_flags(path_policy);
 
-		path = *(++paths);
+		//all we do is bind mounts
+		mount_flags |= MS_BIND;
+
+
+		if(path_policy->policy & QSSB_MOUNT_ALLOW_READ)
+		{
+			ret = mount(path_policy->mountpoint, path_inside_chroot,  NULL, mount_flags, NULL);
+			if(ret < 0 )
+			{
+				QSSB_LOG_ERROR("Error: Failed to mount %s to %s: %s\n", path_policy->mountpoint, path_inside_chroot, strerror(errno));
+				return ret;
+			}
+
+			//remount so noexec, readonly etc. take effect
+			ret = mount(NULL, path_inside_chroot, NULL, mount_flags | MS_REMOUNT, NULL);
+			if(ret < 0 )
+			{
+				QSSB_LOG_ERROR("Error: Failed to remount %s: %s", path_inside_chroot, strerror(errno));
+				return ret;
+			}
+		}
+		path_policy = path_policy->next;
 	}
 
 	return 0;
@@ -451,15 +512,11 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		return -1;
 	}
 
-	if(policy->readonly_paths != NULL || policy->writable_paths != NULL)
+	if(policy->path_policies != NULL)
 	{
-		if(mount_to_chroot(policy->chroot_target_path, policy->readonly_paths,  MS_BIND | MS_RDONLY | MS_REC) < 0)
+		if(mount_to_chroot(policy->chroot_target_path, policy->path_policies) < 0)
 		{
-			return -1;
-		}
-
-		if(mount_to_chroot(policy->chroot_target_path, policy->writable_paths,  MS_BIND | MS_REC) < 0)
-		{
+			QSSB_LOG_ERROR("mount_to_chroot: setup of path policies failed\n");
 			return -1;
 		}
 
