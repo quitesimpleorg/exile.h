@@ -102,8 +102,8 @@ struct qssb_policy
 	int syscall_default_policy;
 	int *blacklisted_syscalls;
 	int *allowed_syscalls;
-	char *chroot_target_path;
-	char *chdir_path;
+	const char *chroot_target_path;
+	const char *chdir_path;
 	struct qssb_path_policy *path_policies;
 };
 
@@ -227,7 +227,7 @@ static int get_policy_mount_flags(struct qssb_path_policy *policy)
 		result |= MS_NOSUID;
 	}
 
-	if( (policy->policy & QSSB_MOUNT_ALLOW_WRITE) == QSSB_MOUNT_ALLOW_READ)
+	if( ((policy->policy) & (QSSB_MOUNT_ALLOW_WRITE)) == QSSB_MOUNT_ALLOW_READ)
 	{
 		result |= MS_RDONLY;
 	}
@@ -417,10 +417,11 @@ static int seccomp_enable(int *syscalls, int per_syscall, int default_action)
 		LOAD_SYSCALL_NR,
 	};
 
-	int current_filter_index = 1;
-	while(*syscalls != -1)
+	unsigned short int current_filter_index = 1;
+	while(*syscalls >= 0)
 	{
-		struct sock_filter syscall = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, *syscalls, 0, 1);
+		unsigned int sysc = (unsigned int) *syscalls;
+		struct sock_filter syscall = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, sysc, 0, 1);
 		struct sock_filter action = BPF_STMT(BPF_RET+BPF_K, per_syscall);
 		filter[current_filter_index++] = syscall;
 		filter[current_filter_index++] = action;
@@ -430,9 +431,10 @@ static int seccomp_enable(int *syscalls, int per_syscall, int default_action)
 
 	struct sock_filter da = BPF_STMT(BPF_RET+BPF_K, default_action);
 	filter[current_filter_index] = da;
-	
+
+	++current_filter_index;
 	struct sock_fprog prog = {
-		.len = current_filter_index + 1,
+		.len = current_filter_index ,
 		.filter = filter,
 	};
 
@@ -482,7 +484,7 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->chroot_target_path == NULL)
 	{
-		char *target_dir = calloc(1, PATH_MAX * sizeof(char));
+		char *target_dir = (char *) calloc(1, PATH_MAX * sizeof(char));
 		char random_str[17];
 		if(random_string(random_str, sizeof(random_str)) == 16)
 		{
