@@ -481,33 +481,6 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		return -EINVAL;
 	}
 
-
-	if(policy->chroot_target_path == NULL)
-	{
-		char *target_dir = (char *) calloc(1, PATH_MAX * sizeof(char));
-		char random_str[17];
-		if(random_string(random_str, sizeof(random_str)) == 16)
-		{
-			int res = snprintf(target_dir, PATH_MAX, "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
-			if(res < 0)
-			{
-				QSSB_LOG_ERROR("qssb: qssb_enable_policy: error during path concatination\n");
-				return -EINVAL;
-			}
-			if(res >= PATH_MAX)
-			{
-				QSSB_LOG_ERROR("qssb: qssb_enable_policy: path concatination truncated\n");
-				return -EINVAL;
-			}
-			policy->chroot_target_path = target_dir;
-		}
-		else
-		{
-			QSSB_LOG_ERROR("Error creating random sandbox directory name\n");
-			return -1;
-		}
-	}
-
 	if(enter_namespaces(policy->namespace_options) < 0)
 	{
 		QSSB_LOG_ERROR("Error while trying to enter namespaces\n");
@@ -516,6 +489,32 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->path_policies != NULL)
 	{
+		if(policy->chroot_target_path == NULL)
+		{
+			char *target_dir = (char *) calloc(1, PATH_MAX * sizeof(char));
+			char random_str[17];
+			if(random_string(random_str, sizeof(random_str)) == 16)
+			{
+				int res = snprintf(target_dir, PATH_MAX, "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
+				if(res < 0)
+				{
+					QSSB_LOG_ERROR("qssb: qssb_enable_policy: error during path concatination\n");
+					return -EINVAL;
+				}
+				if(res >= PATH_MAX)
+				{
+					QSSB_LOG_ERROR("qssb: qssb_enable_policy: path concatination truncated\n");
+					return -EINVAL;
+				}
+				policy->chroot_target_path = target_dir;
+			}
+			else
+			{
+				QSSB_LOG_ERROR("Error creating random sandbox directory name\n");
+				return -1;
+			}
+		}
+
 		if(mount_to_chroot(policy->chroot_target_path, policy->path_policies) < 0)
 		{
 			QSSB_LOG_ERROR("mount_to_chroot: setup of path policies failed\n");
