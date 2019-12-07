@@ -119,7 +119,7 @@ struct qssb_policy *qssb_init_policy()
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
 	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
-	result->chdir_path = "/";
+	result->chdir_path = NULL;
 	result->chroot_target_path = NULL;
 	result->path_policies = NULL;
 	return result;
@@ -526,10 +526,16 @@ int qssb_enable_policy(struct qssb_policy *policy)
 			QSSB_LOG_ERROR("chroot: failed to enter %s\n", policy->chroot_target_path);
 			return -1;
 		}
+
+		if(policy->chdir_path == NULL)
+		{
+			policy->chdir_path = "/";
+		}
 	}
 
-	if(chdir(policy->chdir_path) < 0)
+	if(policy->chdir_path != NULL && chdir(policy->chdir_path) < 0)
 	{
+		QSSB_LOG_ERROR("chdir to %s failed\n", policy->chdir_path);
 		return -1;
 	}
 
