@@ -102,7 +102,7 @@ struct qssb_policy
 	int syscall_default_policy;
 	int *blacklisted_syscalls;
 	int *allowed_syscalls;
-	const char *chroot_target_path;
+	char chroot_target_path[PATH_MAX];
 	const char *chdir_path;
 	struct qssb_path_policy *path_policies;
 };
@@ -120,7 +120,7 @@ struct qssb_policy *qssb_init_policy()
 	result->no_new_privs = 1;
 	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
 	result->chdir_path = NULL;
-	result->chroot_target_path = NULL;
+	result->chroot_target_path[0] = '\0';
 	result->path_policies = NULL;
 	return result;
 }
@@ -491,11 +491,10 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	{
 		if(policy->chroot_target_path == NULL)
 		{
-			char *target_dir = (char *) calloc(1, PATH_MAX * sizeof(char));
 			char random_str[17];
 			if(random_string(random_str, sizeof(random_str)) == 16)
 			{
-				int res = snprintf(target_dir, PATH_MAX, "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
+				int res = snprintf(policy->chroot_target_path, sizeof(policy->chroot_target_path), "%s/.sandbox_%" PRIdMAX "_%s", QSSB_TEMP_DIR, (intmax_t)getpid(), random_str);
 				if(res < 0)
 				{
 					QSSB_LOG_ERROR("qssb: qssb_enable_policy: error during path concatination\n");
@@ -506,7 +505,6 @@ int qssb_enable_policy(struct qssb_policy *policy)
 					QSSB_LOG_ERROR("qssb: qssb_enable_policy: path concatination truncated\n");
 					return -EINVAL;
 				}
-				policy->chroot_target_path = target_dir;
 			}
 			else
 			{
