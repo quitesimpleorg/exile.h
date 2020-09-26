@@ -489,7 +489,7 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->path_policies != NULL)
 	{
-		if(policy->chroot_target_path == NULL)
+		if(*policy->chroot_target_path == '\0')
 		{
 			char random_str[17];
 			if(random_string(random_str, sizeof(random_str)) == 16)
