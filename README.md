@@ -1,7 +1,7 @@
 qssb.h (quite simple sandbox)
 =============================
 qssb.h is a simple header only library that provides an interface
-to sandbox applications. Using Seccomp and Linux Namespaces for that
+to sandbox applications on Linux. Using Seccomp and Linux Namespaces for that
 purpose requires some knowledge of annoying details which this library
 aims to abstract away as much as possible.
 
@@ -11,8 +11,10 @@ No release yet, API is unstable.
 
 Features
 ========
-Systemcall filtering, restricting file system access, dropping
-privileges, isolating the application from the network, etc.
+  - Systemcall filtering
+  - restricting file system access
+  - dropping privileges 
+  - isolating the application from the network, etc.
 
 Requirements
 ============
@@ -42,7 +44,9 @@ To be written
 
 Examples
 ========
-Real world project: cgit sandboxed: https://git.quitesimple.org/cgitsb
+  - qswiki: https://gitea.quitesimple.org/crtxcr/qswiki
+  - cgit sandboxed: https://gitea.quitesimple.org/crtxcr/cgitsb
+  - qpdfviewsb sandboxed (quick and dirty): https://gitea.quitesimple.org/crtxcr/qpdfviewsb
 
 
 Contributing
