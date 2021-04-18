@@ -410,7 +410,7 @@ static int drop_caps()
  * 
  * @returns: 0 on success, -1 on error
  */
-static int seccomp_enable(int *syscalls, int per_syscall, int default_action)
+static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int default_action)
 {
 	struct sock_filter filter[1024] =
 	{
