@@ -52,13 +52,13 @@
 #define QSSB_SYS(x)		(__NR_##x)
 
 //TODO: implement
-#define QSSB_MOUNT_ALLOW_NOTHING 0 //explicit rule
+#define QSSB_FS_ALLOW_NOTHING 0 //explicit rule
 
-#define QSSB_MOUNT_ALLOW_READ 1<<0
-#define QSSB_MOUNT_ALLOW_WRITE (1<<1) | QSSB_MOUNT_ALLOW_READ
-#define QSSB_MOUNT_ALLOW_EXEC 1<<2
-#define QSSB_MOUNT_ALLOW_DEV 1<<3
-#define QSSB_MOUNT_ALLOW_SETUID 1<<4
+#define QSSB_FS_ALLOW_READ 1<<0
+#define QSSB_FS_ALLOW_WRITE (1<<1) | QSSB_FS_ALLOW_READ
+#define QSSB_FS_ALLOW_EXEC 1<<2
+#define QSSB_FS_ALLOW_DEV 1<<3
+#define QSSB_FS_ALLOW_SETUID 1<<4
 //don't mount recursive
 #define QSSB_MOUNT_NOT_REC 1<<5
 
@@ -212,22 +212,22 @@ static int get_policy_mount_flags(struct qssb_path_policy *policy)
 {
 	int result = 0;
 
-	if( (policy->policy & QSSB_MOUNT_ALLOW_DEV) == 0)
+	if( (policy->policy & QSSB_FS_ALLOW_DEV) == 0)
 	{
 		result |= MS_NODEV;
 	}
 
-	if( (policy->policy & QSSB_MOUNT_ALLOW_EXEC) == 0)
+	if( (policy->policy & QSSB_FS_ALLOW_EXEC) == 0)
 	{
 		result |= MS_NOEXEC;
 	}
 
-	if( (policy->policy & QSSB_MOUNT_ALLOW_SETUID) == 0)
+	if( (policy->policy & QSSB_FS_ALLOW_SETUID) == 0)
 	{
 		result |= MS_NOSUID;
 	}
 
-	if( ((policy->policy) & (QSSB_MOUNT_ALLOW_WRITE)) == QSSB_MOUNT_ALLOW_READ)
+	if( ((policy->policy) & (QSSB_FS_ALLOW_WRITE)) == QSSB_FS_ALLOW_READ)
 	{
 		result |= MS_RDONLY;
 	}
@@ -273,7 +273,7 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
 		mount_flags |= MS_BIND;
 
 
-		if(path_policy->policy & QSSB_MOUNT_ALLOW_READ)
+		if(path_policy->policy & QSSB_FS_ALLOW_READ)
 		{
 			ret = mount(path_policy->mountpoint, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
