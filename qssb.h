@@ -41,6 +41,11 @@
 #include <inttypes.h>
 #include <asm/unistd.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
+	#include <linux/landlock.h>
+	#define HAVE_LANDLOCK 1
+#endif
+
 //TODO: stolen from kernel samples/seccomp, GPLv2...?
 #define ALLOW \
 	BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
@@ -77,6 +82,18 @@
 #define QSSB_FS_ALLOW_SETUID 1<<4
 //don't mount recursive
 #define QSSB_MOUNT_NOT_REC 1<<5
+
+#if HAVE_LANDLOCK == 1
+#define QSSB_FS_ALLOW_REMOVE_DIR		(1 << 7)
+#define QSSB_FS_ALLOW_REMOVE_FILE		(1 << 8)
+#define QSSB_FS_ALLOW_MAKE_CHAR			(1 << 9)
+#define QSSB_FS_ALLOW_MAKE_DIR			(1 << 10)
+#define QSSB_FS_ALLOW_MAKE_REG			(1 << 11)
+#define QSSB_FS_ALLOW_MAKE_SOCK			(1 << 12)
+#define QSSB_FS_ALLOW_MAKE_FIFO			(1 << 13)
+#define QSSB_FS_ALLOW_MAKE_BLOCK		(1 << 14)
+#define QSSB_FS_ALLOW_MAKE_SYM			(1 << 15)
+#endif
 
 
 /* Most exploits have more need for those syscalls than the
