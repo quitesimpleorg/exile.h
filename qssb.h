@@ -118,8 +118,8 @@ static int default_blacklisted_syscals[] = {
 
 struct qssb_path_policy
 {
-	const char *mountpoint;
-	int policy;
+	const char *path;
+	unsigned int policy;
 	struct qssb_path_policy *next;
 };
 
@@ -282,7 +282,7 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
 	{
 
 		char path_inside_chroot[PATH_MAX];
-		int written = snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path_policy->mountpoint);
+		int written = snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path_policy->path);
 		if(written < 0)
 		{
 			QSSB_LOG_ERROR("qssb: mount_to_chroot: Error during path concatination\n");
@@ -308,10 +308,10 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
 
 		if(path_policy->policy & QSSB_FS_ALLOW_READ)
 		{
-			ret = mount(path_policy->mountpoint, path_inside_chroot,  NULL, mount_flags, NULL);
+			ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
 			{
-				QSSB_LOG_ERROR("Error: Failed to mount %s to %s: %s\n", path_policy->mountpoint, path_inside_chroot, strerror(errno));
+				QSSB_LOG_ERROR("Error: Failed to mount %s to %s: %s\n", path_policy->path, path_inside_chroot, strerror(errno));
 				return ret;
 			}
 
