@@ -136,6 +136,9 @@ struct qssb_policy
 	int no_new_privs;
 	int namespace_options;
 	int syscall_default_policy;
+	/* Bind mounts all paths in path_policies into the chroot and applies
+	 non-landlock policies */
+	int mount_path_policies_to_chroot;
 	int *blacklisted_syscalls;
 	int *allowed_syscalls;
 	char chroot_target_path[PATH_MAX];
@@ -156,6 +159,7 @@ struct qssb_policy *qssb_init_policy()
 	result->no_new_privs = 1;
 	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
 	result->chdir_path = NULL;
+	result->mount_path_policies_to_chroot = 0;
 	result->chroot_target_path[0] = '\0';
 	result->path_policies = NULL;
 	return result;
@@ -503,6 +507,13 @@ static int seccomp_enable_whitelist(int *syscalls)
 	return seccomp_enable(syscalls, SECCOMP_RET_ALLOW, SECCOMP_RET_KILL);
 }
 
+#if HAVE_LANDLOCK == 1
+static int enable_landlock_policies(struct qssb_path_policy *policies)
+{
+	return 0;
+}
+#endif
+
 /* Enables the specified qssb_policy.
  * 
  * The calling process is supposed *TO BE WRITTEN* if 
@@ -523,7 +534,7 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		return -1;
 	}
 
-	if(policy->path_policies != NULL)
+	if(policy->mount_path_policies_to_chroot && policy->path_policies != NULL)
 	{
 		if(*policy->chroot_target_path == '\0')
 		{
@@ -551,20 +562,34 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 		if(mount_to_chroot(policy->chroot_target_path, policy->path_policies) < 0)
 		{
-			QSSB_LOG_ERROR("mount_to_chroot: setup of path policies failed\n");
+			QSSB_LOG_ERROR("mount_to_chroot: bind mounting of path policies failed\n");
 			return -1;
 		}
+	}
 
+	if(*policy->chroot_target_path != '\0')
+	{
 		if(chroot(policy->chroot_target_path) < 0)
 		{
 			QSSB_LOG_ERROR("chroot: failed to enter %s\n", policy->chroot_target_path);
 			return -1;
 		}
+	}
 
-		if(policy->chdir_path == NULL)
+#if HAVE_LANDLOCK == 1
+	if(policy->path_policies != NULL)
+	{
+		if(enable_landlock_policies(policy->path_policies) < 0)
 		{
-			policy->chdir_path = "/";
+			QSSB_LOG_ERROR("enable_landlock_policies: Failed to enable landlock policies\n");
+			return -1;
 		}
+	}
+#endif
+
+	if(policy->chdir_path == NULL)
+	{
+		policy->chdir_path = "/";
 	}
 
 	if(policy->chdir_path != NULL && chdir(policy->chdir_path) < 0)
