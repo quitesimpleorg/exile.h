@@ -514,6 +514,49 @@ static int enable_landlock_policies(struct qssb_path_policy *policies)
 }
 #endif
 
+
+/* Checks for illogical or dangerous combinations */
+static int check_policy_sanity(struct qssb_policy *policy)
+{
+	if(policy->blacklisted_syscalls != NULL && policy->allowed_syscalls != NULL)
+	{
+		QSSB_LOG_ERROR("Error: Cannot mix blacklisted and whitelisted systemcalls\n");
+		return -EINVAL;
+	}
+
+	if(policy->mount_path_policies_to_chroot == 1)
+	{
+		if(policy->path_policies == NULL)
+		{
+			QSSB_LOG_ERROR("Cannot mount path policies to chroot if non are given\n");
+			return -1;
+		}
+		if(!(policy->namespace_options & QSSB_UNSHARE_MOUNT))
+		{
+			QSSB_LOG_ERROR("mount_path_policies_to_chroot = 1 requires unsharing mount namespace\n");
+			return -1;
+		}
+	}
+
+	if(policy->no_new_privs != 1)
+	{
+		if(policy->blacklisted_syscalls != NULL || policy->allowed_syscalls != NULL)
+		{
+			QSSB_LOG_ERROR("no_new_privs = 1 is required for seccomp filtering!\n");
+			return -1;
+		}
+	}
+
+	if(policy->path_policies != NULL && policy->mount_path_policies_to_chroot != 1)
+	{
+		#if HAVE_LANDLOCK != 1
+			QSSB_LOG_ERROR("Path policies cannot be enforced! System needs landlock support or set mount_path_policies_to_chroot = 1\n");
+			return -1;
+		#endif
+	}
+	return 0;
+}
+
 /* Enables the specified qssb_policy.
  * 
  * The calling process is supposed *TO BE WRITTEN* if 
@@ -522,9 +565,9 @@ static int enable_landlock_policies(struct qssb_path_policy *policies)
  */
 int qssb_enable_policy(struct qssb_policy *policy)
 {
-	if(policy->blacklisted_syscalls != NULL && policy->allowed_syscalls != NULL)
+	if(check_policy_sanity(policy) != 0)
 	{
-		QSSB_LOG_ERROR("Error: Cannot mix blacklisted and whitelisted systemcalls\n");
+		QSSB_LOG_ERROR("Error: Policy sanity check failed. Cannot apply policy!\n");
 		return -EINVAL;
 	}
 
