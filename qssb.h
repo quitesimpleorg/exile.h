@@ -72,9 +72,6 @@
 
 #define QSSB_SYS(x)		(__NR_##x)
 
-//TODO: implement
-#define QSSB_FS_ALLOW_NOTHING 0 //explicit rule
-
 #define QSSB_FS_ALLOW_READ 1<<0
 #define QSSB_FS_ALLOW_WRITE (1<<1) | QSSB_FS_ALLOW_READ
 #define QSSB_FS_ALLOW_EXEC 1<<2
