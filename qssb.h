@@ -36,14 +36,20 @@
 #include <linux/limits.h>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
+#include <linux/version.h>
 #include <sys/capability.h>
 #include <stddef.h>
 #include <inttypes.h>
 #include <asm/unistd.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
+#ifndef HAVE_LANDLOCK
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
+		/* TODO: Hopefully a fair assumption. But we need to runtime checks */
+		#define HAVE_LANDLOCK = 1
+	#endif
+#endif
+#if HAVE_LANDLOCK == 1
 	#include <linux/landlock.h>
-	#define HAVE_LANDLOCK 1
 #endif
 
 //TODO: stolen from kernel samples/seccomp, GPLv2...?
