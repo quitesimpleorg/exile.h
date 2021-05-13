@@ -50,6 +50,9 @@
 #endif
 #if HAVE_LANDLOCK == 1
 	#include <linux/landlock.h>
+	#if LANDLOCK_CREATE_RULESET_VERSION != (1U << 0)
+		#error "This landlock ABI version is not supported by qssb (yet)"
+	#endif
 #endif
 
 //TODO: stolen from kernel samples/seccomp, GPLv2...?
@@ -96,8 +99,36 @@
 #define QSSB_FS_ALLOW_MAKE_FIFO			(1 << 13)
 #define QSSB_FS_ALLOW_MAKE_BLOCK		(1 << 14)
 #define QSSB_FS_ALLOW_MAKE_SYM			(1 << 15)
+#define QSSB_FS_ALLOW_WRITE_FILE 		(1 << 16)
+#define QSSB_FS_ALLOW_READ_DIR			(1 << 17)
+#define QSSB_FS_ALLOW_REMOVE 			(1 << 18)
+#ifndef landlock_create_ruleset
+static inline int landlock_create_ruleset(
+		const struct landlock_ruleset_attr *const attr,
+		const size_t size, const __u32 flags)
+{
+	return syscall(__NR_landlock_create_ruleset, attr, size, flags);
+}
 #endif
 
+#ifndef landlock_add_rule
+static inline int landlock_add_rule(const int ruleset_fd,
+		const enum landlock_rule_type rule_type,
+		const void *const rule_attr, const __u32 flags)
+{
+	return syscall(__NR_landlock_add_rule, ruleset_fd, rule_type,
+			rule_attr, flags);
+}
+#endif
+
+#ifndef landlock_restrict_self
+static inline int landlock_restrict_self(const int ruleset_fd,
+		const __u32 flags)
+{
+	return syscall(__NR_landlock_restrict_self, ruleset_fd, flags);
+}
+#endif
+#endif
 
 /* Most exploits have more need for those syscalls than the
  * exploited programs. In cases they are needed, this list should be
@@ -146,7 +177,6 @@ struct qssb_policy
 	struct qssb_path_policy *path_policies;
 };
 
-
 /* Creates the default policy
  * Must be freed using qssb_free_policy
  * @returns: default policy */
@@ -190,8 +220,8 @@ int random_string(char *buffer, size_t buffer_length)
 }
 
 
-/* Creates a directory and all necessary parent directories 
- * 
+/* Creates a directory and all necessary parent directories
+ *
  * @returns: 0 on success, -ERRNO on failure
  * */
 static int mkdir_structure(const char *p, mode_t mode)
@@ -212,7 +242,7 @@ static int mkdir_structure(const char *p, mode_t mode)
 
 	char *begin = path;
 	char *end = begin+1;
-	
+
 	while(*end)
 	{
 		if(*end == '/')
@@ -281,7 +311,7 @@ static int get_policy_mount_flags(struct qssb_path_policy *policy)
 
 /* Helper to mount directories into the chroot path "chroot_target_path"
  * Paths will be created if necessary
- 
+
  * @returns: 0 on sucess, -ERRNO on failure */
 static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_policy *path_policy)
 {
@@ -373,7 +403,7 @@ static int enter_namespaces(int namespace_options)
 
 		fp = fopen("/proc/self/uid_map", "w");
 		fprintf(fp, "0 %i", current_uid);
-		fclose(fp); 
+		fclose(fp);
 
 		fp = fopen("/proc/self/gid_map", "w");
 		fprintf(fp, "0 %i", current_gid);
@@ -400,11 +430,11 @@ static int enter_namespaces(int namespace_options)
 		}
 	}
 
-	return 0;	
+	return 0;
 }
 
-/* Drops all capabiltiies held by the process 
- * 
+/* Drops all capabiltiies held by the process
+ *
  * @returns: 0 on sucess, -1 on error
 */
 static int drop_caps()
@@ -443,11 +473,11 @@ static int drop_caps()
 
 /*
  * Enables the per_syscall seccomp action for system calls
- * 
+ *
  * syscalls: array of system calls numbers. -1 must be the last entry.
  * per_syscall: action to apply for each system call
  * default_action: the default action at the end
- * 
+ *
  * @returns: 0 on success, -1 on error
  */
 static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int default_action)
@@ -465,7 +495,7 @@ static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int 
 		struct sock_filter action = BPF_STMT(BPF_RET+BPF_K, per_syscall);
 		filter[current_filter_index++] = syscall;
 		filter[current_filter_index++] = action;
-		
+
 		++syscalls;
 	}
 
@@ -478,7 +508,7 @@ static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int 
 		.filter = filter,
 	};
 
-	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog) == -1) 
+	if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog) == -1)
 	{
 		QSSB_LOG_ERROR("prctl SET_SECCOMP %s\n", strerror(errno));
 		return -1;
@@ -489,7 +519,7 @@ static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int 
 
 /*
  * Blacklists the specified systemcalls.
- * 
+ *
  * syscalls: array of system calls numbers. -1 must be the last entry.
  */
 static int seccomp_enable_blacklist(int *syscalls)
@@ -499,7 +529,7 @@ static int seccomp_enable_blacklist(int *syscalls)
 
 /*
  * Blacklists the specified systemcalls.
- * 
+ *
  * syscalls: array of system calls numbers. -1 must be the last entry.
  */
 static int seccomp_enable_whitelist(int *syscalls)
@@ -508,9 +538,117 @@ static int seccomp_enable_whitelist(int *syscalls)
 }
 
 #if HAVE_LANDLOCK == 1
-static int enable_landlock_policies(struct qssb_path_policy *policies)
+static unsigned int qssb_flags_to_landlock(unsigned int flags)
 {
-	return 0;
+	unsigned int result = 0;
+	if(flags & QSSB_FS_ALLOW_DEV)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
+		result |= LANDLOCK_ACCESS_FS_MAKE_CHAR;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_BLOCK)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_CHAR)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_CHAR;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_DIR)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_DIR;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_FIFO)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_FIFO;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_REG)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_REG;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_SOCK)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_SOCK;
+	}
+	if(flags & QSSB_FS_ALLOW_MAKE_SYM)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
+	}
+	if(flags & QSSB_FS_ALLOW_READ)
+	{
+		result |= LANDLOCK_ACCESS_FS_READ_FILE;
+		result |= LANDLOCK_ACCESS_FS_READ_DIR;
+	}
+	if(flags & QSSB_FS_ALLOW_REMOVE)
+	{
+		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+		result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+	}
+	if(flags & QSSB_FS_ALLOW_REMOVE_DIR)
+	{
+		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+	}
+	if(flags & QSSB_FS_ALLOW_REMOVE_FILE)
+	{
+		result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+	}
+	if(flags & QSSB_FS_ALLOW_EXEC)
+	{
+		result |= LANDLOCK_ACCESS_FS_EXECUTE;
+	}
+	if(flags & QSSB_FS_ALLOW_WRITE)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_REG;
+		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
+	}
+	if(flags & QSSB_FS_ALLOW_WRITE_FILE)
+	{
+		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
+	}
+	if(flags & QSSB_FS_ALLOW_READ_DIR)
+	{
+		result |= LANDLOCK_ACCESS_FS_READ_DIR;
+	}
+	return result;
+}
+
+static int landlock_prepare_ruleset(struct qssb_path_policy *policies)
+{
+	int ruleset_fd = -1;
+	struct landlock_ruleset_attr ruleset_attr;
+	/* We here want the maximum possible ruleset, so set the var to the max possible bitmask.
+	   Stolen/Adapted from: [linux src]/security/landlock/limits.h
+	*/
+	ruleset_attr.handled_access_fs = ((LANDLOCK_ACCESS_FS_MAKE_SYM << 1) - 1);
+
+	ruleset_fd = landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
+	if (ruleset_fd < 0)
+	{
+		QSSB_LOG_ERROR("Failed to create landlock ruleset");
+		return -1;
+	}
+	struct qssb_path_policy *policy = policies;
+	while(policy != NULL)
+	{
+		struct landlock_path_beneath_attr path_beneath;
+		path_beneath.parent_fd = open(policy->path, O_PATH | O_CLOEXEC);
+		if(path_beneath.parent_fd < 0)
+		{
+			QSSB_LOG_ERROR("Failed to open policy path %s while preparing landlock ruleset\n", policy->path);
+			close(ruleset_fd);
+			return path_beneath.parent_fd;
+		}
+		path_beneath.allowed_access = qssb_flags_to_landlock(policy->policy);
+		int ret = landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &path_beneath, 0);
+		if(ret)
+		{
+			QSSB_LOG_ERROR("Failed to update ruleset while processsing policy path %s\n", policy->path);
+			close(ruleset_fd);
+			return ret;
+		}
+		policy = policy->next;
+	}
+	return ruleset_fd;
 }
 #endif
 
@@ -558,8 +696,8 @@ static int check_policy_sanity(struct qssb_policy *policy)
 }
 
 /* Enables the specified qssb_policy.
- * 
- * The calling process is supposed *TO BE WRITTEN* if 
+ *
+ * The calling process is supposed *TO BE WRITTEN* if
  * this function fails.
  * @returns: 0 on sucess, <0 on error
  */
@@ -620,11 +758,13 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	}
 
 #if HAVE_LANDLOCK == 1
+	int landlock_ruleset_fd = -1;
 	if(policy->path_policies != NULL)
 	{
-		if(enable_landlock_policies(policy->path_policies) < 0)
+		landlock_ruleset_fd = landlock_prepare_ruleset(policy->path_policies);
+		if(landlock_ruleset_fd < 0)
 		{
-			QSSB_LOG_ERROR("enable_landlock_policies: Failed to enable landlock policies\n");
+			QSSB_LOG_ERROR("landlock_prepare_ruleset: Failed to prepare landlock ruleset: %s\n", strerror(errno));
 			return -1;
 		}
 	}
@@ -665,8 +805,18 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		{
 			QSSB_LOG_ERROR("prctl: PR_SET_NO_NEW_PRIVS failed: %s\n", strerror(errno));
 			return -1;
-		}	
+		}
 	}
+
+#if HAVE_LANDLOCK == 1
+	if (policy->path_policies != NULL && landlock_restrict_self(landlock_ruleset_fd, 0) != 0)
+	{
+		perror("Failed to enforce ruleset");
+		close(landlock_ruleset_fd);
+		return -1;
+	}
+	close(landlock_ruleset_fd);
+#endif
 
 	if(policy->allowed_syscalls != NULL)
 	{
