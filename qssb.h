@@ -83,7 +83,7 @@
 #define QSSB_SYS(x)		(__NR_##x)
 
 #define QSSB_FS_ALLOW_READ 1<<0
-#define QSSB_FS_ALLOW_WRITE (1<<1) | QSSB_FS_ALLOW_READ
+#define QSSB_FS_ALLOW_WRITE (1<<1)
 #define QSSB_FS_ALLOW_EXEC 1<<2
 #define QSSB_FS_ALLOW_DEV 1<<3
 #define QSSB_FS_ALLOW_SETUID 1<<4
@@ -334,12 +334,12 @@ static int get_policy_mount_flags(struct qssb_path_policy *policy)
 		result |= MS_NOSUID;
 	}
 
-	if( ((policy->policy) & (QSSB_FS_ALLOW_WRITE)) == QSSB_FS_ALLOW_READ)
+	if( (policy->policy & QSSB_FS_ALLOW_WRITE) == 0)
 	{
 		result |= MS_RDONLY;
 	}
 
-	if( !(policy->policy & QSSB_MOUNT_NOT_REC))
+	if( (policy->policy & QSSB_MOUNT_NOT_REC) == 0)
 	{
 		result |= MS_REC;
 	}
@@ -380,7 +380,7 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
 		mount_flags |= MS_BIND;
 
 
-		if(path_policy->policy & QSSB_FS_ALLOW_READ)
+		if(path_policy->policy & QSSB_FS_ALLOW_READ || path_policy->policy & QSSB_FS_ALLOW_WRITE)
 		{
 			ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
