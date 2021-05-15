@@ -415,6 +415,13 @@ int qssb_end_policy(struct qssb_policy *ctxt)
  */
 void qssb_free_policy(struct qssb_policy *ctxt)
 {
+	struct qssb_path_policy *current = ctxt->path_policies;
+	while(current)
+	{
+		struct qssb_path_policy *tmp = current;
+		current = current->next;
+		free(tmp);
+	}
 	free(ctxt);
 }
 
