@@ -29,6 +29,7 @@
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/random.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -102,6 +103,7 @@
 #define QSSB_FS_ALLOW_WRITE_FILE 		(1 << 16)
 #define QSSB_FS_ALLOW_READ_DIR			(1 << 17)
 #define QSSB_FS_ALLOW_REMOVE 			(1 << 18)
+
 #ifndef landlock_create_ruleset
 static inline int landlock_create_ruleset(
 		const struct landlock_ruleset_attr *const attr,
@@ -174,7 +176,10 @@ struct qssb_policy
 	int *allowed_syscalls;
 	char chroot_target_path[PATH_MAX];
 	const char *chdir_path;
+
+	/* Do not manually add policies here, use qssb_append_path_polic*() */
 	struct qssb_path_policy *path_policies;
+	struct qssb_path_policy **path_policies_tail;
 };
 
 /* Creates the default policy
@@ -192,9 +197,43 @@ struct qssb_policy *qssb_init_policy()
 	result->mount_path_policies_to_chroot = 0;
 	result->chroot_target_path[0] = '\0';
 	result->path_policies = NULL;
+	result->path_policies_tail = &(result->path_policies);
 	return result;
 }
 
+int qssb_append_path_policies(struct qssb_policy *qssb_policy, unsigned int path_policy, ...)
+{
+	va_list args;
+	const char *path;
+	va_start(args, path_policy);
+
+	path = va_arg(args, char*);
+	while(path != NULL)
+	{
+		struct qssb_path_policy *newpolicy = calloc(1, sizeof(struct qssb_path_policy));
+		if(newpolicy == NULL)
+		{
+			QSSB_LOG_ERROR("Failed to allocate memory for path policy\n");
+			return -1;
+		}
+		newpolicy->path = path;
+		newpolicy->policy = path_policy;
+		newpolicy->next = NULL;
+
+		*(qssb_policy->path_policies_tail) = newpolicy;
+		qssb_policy->path_policies_tail = &(newpolicy->next);
+		path = va_arg(args, char*);
+	}
+
+	va_end(args);
+
+	return 0;
+}
+
+int qssb_append_path_policy(struct qssb_policy *qssb_policy, unsigned int path_policy, const char *path)
+{
+	return qssb_append_path_policies(qssb_policy, path_policy, path, NULL);
+}
 
 /*
  * Fills buffer with random characters a-z.
@@ -274,8 +313,6 @@ static int mkdir_structure(const char *p, mode_t mode)
 	}
 	return 0;
 }
-
-
 
 /* @returns: argument for mount(2) flags */
 static int get_policy_mount_flags(struct qssb_path_policy *policy)
