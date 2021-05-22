@@ -203,6 +203,13 @@ struct qssb_policy *qssb_init_policy()
 	return result;
 }
 
+/* Appends path policies to the qssb_policy object
+ * The last paramater must be NULL
+ *
+ * This function does not copy parameters. All passed paths
+ * MUST NOT be freed until qssb_enable_policy() is called!
+ *
+ * @returns: 0 on success, -1 on failure */
 int qssb_append_path_policies(struct qssb_policy *qssb_policy, unsigned int path_policy, ...)
 {
 	va_list args;
@@ -736,9 +743,15 @@ static int check_policy_sanity(struct qssb_policy *policy)
 
 /* Enables the specified qssb_policy.
  *
- * The calling process is supposed *TO BE WRITTEN* if
- * this function fails.
- * @returns: 0 on sucess, <0 on error
+ * This function is not atomic (and can't be). This means some
+ * policies can apply, while others may fail.
+ *
+ * This function returns success only if all policies applied.
+ *
+ * The state is undefined if this function fails. The process generally
+ * should exit.
+ *
+ * @returns: 0 on success (all policies applied), < 0 on error (none or some policies dit not apply)
  */
 int qssb_enable_policy(struct qssb_policy *policy)
 {
