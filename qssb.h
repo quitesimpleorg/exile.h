@@ -402,13 +402,6 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
 	return 0;
 }
 
-/* Ends the policy as best as possible. */
-/* TODO: can this function do actually anything useful?*/
-int qssb_end_policy(struct qssb_policy *ctxt)
-{
-	return 0;
-}
-
 /*
  * Frees the memory taken by a qssb_policy object
  */
