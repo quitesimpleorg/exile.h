@@ -168,7 +168,6 @@ struct qssb_policy
 	int not_dumpable;
 	int no_new_privs;
 	int namespace_options;
-	int syscall_default_policy;
 	/* Bind mounts all paths in path_policies into the chroot and applies
 	 non-landlock policies */
 	int mount_path_policies_to_chroot;
