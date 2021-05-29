@@ -149,6 +149,9 @@ static int default_blacklisted_syscals[] = {
 	QSSB_SYS(ptrace),
 	QSSB_SYS(personality),
 	QSSB_SYS(execve),
+	QSSB_SYS(process_vm_readv),
+	QSSB_SYS(process_vm_writev),
+	QSSB_SYS(userfaultfd),
 	-1
 };
 
