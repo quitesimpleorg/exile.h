@@ -504,7 +504,7 @@ static int drop_caps()
 	drop[1].inheritable = 0;
 	if(capset(&h, drop) == -1)
 	{
-		QSSB_LOG_ERROR("Failed to drop capabilities: %s\n", strerror(errno));;
+		QSSB_LOG_ERROR("Failed to drop capabilities: %s\n", strerror(errno));
 		return -errno;
 	}
 	return 0;
