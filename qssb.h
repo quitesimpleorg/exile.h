@@ -46,7 +46,7 @@
 #ifndef HAVE_LANDLOCK
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
 		/* TODO: Hopefully a fair assumption. But we need to runtime checks */
-		#define HAVE_LANDLOCK = 1
+		#define HAVE_LANDLOCK 1
 	#endif
 #endif
 #if HAVE_LANDLOCK == 1
