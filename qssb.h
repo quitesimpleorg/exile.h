@@ -175,7 +175,7 @@ struct qssb_policy
 	 non-landlock policies */
 	int mount_path_policies_to_chroot;
 	int *blacklisted_syscalls;
-	int *allowed_syscalls;
+	int *whitelisted_syscalls;
 	char chroot_target_path[PATH_MAX];
 	const char *chdir_path;
 
@@ -695,7 +695,7 @@ static int landlock_prepare_ruleset(struct qssb_path_policy *policies)
 /* Checks for illogical or dangerous combinations */
 static int check_policy_sanity(struct qssb_policy *policy)
 {
-	if(policy->blacklisted_syscalls != NULL && policy->allowed_syscalls != NULL)
+	if(policy->blacklisted_syscalls != NULL && policy->whitelisted_syscalls != NULL)
 	{
 		QSSB_LOG_ERROR("Error: Cannot mix blacklisted and whitelisted systemcalls\n");
 		return -EINVAL;
@@ -717,7 +717,7 @@ static int check_policy_sanity(struct qssb_policy *policy)
 
 	if(policy->no_new_privs != 1)
 	{
-		if(policy->blacklisted_syscalls != NULL || policy->allowed_syscalls != NULL)
+		if(policy->blacklisted_syscalls != NULL || policy->whitelisted_syscalls != NULL)
 		{
 			QSSB_LOG_ERROR("no_new_privs = 1 is required for seccomp filtering!\n");
 			return -1;
@@ -857,9 +857,9 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	close(landlock_ruleset_fd);
 #endif
 
-	if(policy->allowed_syscalls != NULL)
+	if(policy->whitelisted_syscalls != NULL)
 	{
-		if(seccomp_enable_whitelist(policy->allowed_syscalls) <0)
+		if(seccomp_enable_whitelist(policy->whitelisted_syscalls) <0)
 		{
 			QSSB_LOG_ERROR("seccomp_enable_whitelist failed\n");
 			return -1;

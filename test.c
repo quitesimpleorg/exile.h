@@ -12,7 +12,7 @@ int test_both_syscalls(int argc, char *argv[])
 	struct qssb_policy *policy = qssb_init_policy();
 	int bla[] = { 1,2,3};
 	policy->blacklisted_syscalls = &bla;
-	policy->allowed_syscalls = &bla;
+	policy->whitelisted_syscalls = &bla;
 	int ret = qssb_enable_policy(policy);
 	if(ret != 0)
 	{
