@@ -3,13 +3,12 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-function fail()
+function print_fail()
 {
 	echo -e "${RED}$@${NC}" 1>&2
-	#exit 1
 }
 
-function echogreen()
+function print_success()
 {
 	echo -e "${GREEN}$@${NC}"
 }
@@ -23,15 +22,15 @@ function runtest()
 	ret=$?
 	if [ $must_exit_zero -eq 1 ] ; then
 		if [ $ret -eq 0 ] ; then
-			echogreen "ok"
+			print_success "ok"
 		else
-			fail "fail"
+			print_fail "fail"
 		fi
 	else
 		if [ $ret -eq 0 ] ; then
-			fail "fail"
+			print_fail "fail"
 		else
-			echogreen "ok"
+			print_success "ok"
 		fi
 	fi
 }
