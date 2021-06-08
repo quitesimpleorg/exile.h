@@ -417,14 +417,17 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
  */
 void qssb_free_policy(struct qssb_policy *ctxt)
 {
-	struct qssb_path_policy *current = ctxt->path_policies;
-	while(current)
+	if(ctxt != NULL)
 	{
-		struct qssb_path_policy *tmp = current;
-		current = current->next;
-		free(tmp);
+		struct qssb_path_policy *current = ctxt->path_policies;
+		while(current != NULL)
+		{
+			struct qssb_path_policy *tmp = current;
+			current = current->next;
+			free(tmp);
+		}
+		free(ctxt);
 	}
-	free(ctxt);
 }
 
 /* Enters the specified namespaces */
