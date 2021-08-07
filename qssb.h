@@ -219,7 +219,7 @@ int qssb_append_path_policies(struct qssb_policy *qssb_policy, unsigned int path
 	path = va_arg(args, char*);
 	while(path != NULL)
 	{
-		struct qssb_path_policy *newpolicy = calloc(1, sizeof(struct qssb_path_policy));
+		struct qssb_path_policy *newpolicy = (struct qssb_path_policy *) calloc(1, sizeof(struct qssb_path_policy));
 		if(newpolicy == NULL)
 		{
 			QSSB_LOG_ERROR("Failed to allocate memory for path policy\n");
