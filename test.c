@@ -1,5 +1,10 @@
 #include "qssb.h"
 #include <stdbool.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
 int test_default_main(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -69,6 +74,65 @@ int test_landlock_deny_write(int argc, char *argv[])
 	return 1;
 }
 
+int test_nofs(int argc, char *argv[])
+{
+	struct qssb_policy *policy = qssb_init_policy();
+	policy->no_fs = 1;
+
+	int ret = qssb_enable_policy(policy);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Failed to activate nofs sandbox\n");
+		return -1;
+	}
+
+	int s = socket(AF_INET,SOCK_STREAM,0);
+	if(s == -1)
+	{
+		fprintf(stderr, "Failed to open socket but this was not requested by policy\n");
+		return 0;
+	}
+
+	/* Expect seccomp to take care of this */
+	if(open("/test", O_CREAT | O_WRONLY) >= 0)
+	{
+		fprintf(stderr, "Failed: Do not expect write access\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+
+int test_no_new_fds(int argc, char *argv[])
+{
+	struct qssb_policy *policy = qssb_init_policy();
+	policy->no_new_fds = 1;
+
+	int ret = qssb_enable_policy(policy);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Failed to activate no_new_fd sandbox\n");
+		return -1;
+	}
+
+	if(open("/tmp/test", O_CREAT | O_WRONLY) >= 0)
+	{
+		fprintf(stderr, "Failed: Could open new file descriptor\n");
+		return -1;
+	}
+
+	int s = socket(AF_INET,SOCK_STREAM,0);
+	if(s >= 0)
+	{
+		fprintf(stderr, "Failed: socket got opened but policy denied\n");
+		return -1;
+	}
+
+	return 0;
+
+}
+
 struct dispatcher
 {
 	char *name;
@@ -81,7 +145,9 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-blacklisted", &test_seccomp_blacklisted, false },
 	{ "seccomp-blacklisted-permitted", &test_seccomp_blacklisted_call_permitted, true },
 	{ "landlock", &test_landlock, true },
-	{ "landlock-deny-write", &test_landlock_deny_write, true }
+	{ "landlock-deny-write", &test_landlock_deny_write, true },
+	{ "no_fs", &test_nofs, false},
+	{ "no_new_fds", &test_no_new_fds, true}
 };
 
 int main(int argc, char *argv[])

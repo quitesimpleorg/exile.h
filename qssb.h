@@ -29,6 +29,8 @@
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/random.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -158,6 +160,29 @@ static int default_blacklisted_syscals[] = {
 	-1
 };
 
+/* TODO: Check for completion
+ * Known blacklisting problem (catch up game, etc.)
+ *
+ * However, we use it to enhance "no_fs" policy, which does not solely rely
+ * on seccomp anyway */
+static int fs_access_syscalls[] = {
+	QSSB_SYS(chdir),
+	QSSB_SYS(truncate),
+	QSSB_SYS(stat),
+	QSSB_SYS(flock),
+	QSSB_SYS(chmod),
+	QSSB_SYS(chown),
+	QSSB_SYS(setxattr),
+	QSSB_SYS(utime),
+	QSSB_SYS(ioctl),
+	QSSB_SYS(fcntl),
+	QSSB_SYS(access),
+	QSSB_SYS(open),
+	QSSB_SYS(openat),
+	QSSB_SYS(unlink),
+	-1
+};
+
 struct qssb_path_policy
 {
 	const char *path;
@@ -173,6 +198,8 @@ struct qssb_policy
 	int preserve_cwd;
 	int not_dumpable;
 	int no_new_privs;
+	int no_fs;
+	int no_new_fds;
 	int namespace_options;
 	/* Bind mounts all paths in path_policies into the chroot and applies
 	 non-landlock policies */
@@ -197,6 +224,8 @@ struct qssb_policy *qssb_init_policy()
 	result->drop_caps = 1;
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
+	result->no_fs = 0;
+	result->no_new_fds = 0;
 	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
 	result->chdir_path = NULL;
 	result->mount_path_policies_to_chroot = 0;
@@ -737,14 +766,99 @@ static int check_policy_sanity(struct qssb_policy *policy)
 		}
 	}
 
-	if(policy->path_policies != NULL && policy->mount_path_policies_to_chroot != 1)
+	if(policy->path_policies != NULL)
 	{
-		#if HAVE_LANDLOCK != 1
-			QSSB_LOG_ERROR("Path policies cannot be enforced! System needs landlock support or set mount_path_policies_to_chroot = 1\n");
+
+		if(policy->mount_path_policies_to_chroot != 1)
+		{
+			#if HAVE_LANDLOCK != 1
+				QSSB_LOG_ERROR("Path policies cannot be enforced! System needs landlock support or set mount_path_policies_to_chroot = 1\n");
+				return -1;
+			#endif
+		}
+		if(policy->no_fs == 1)
+		{
+			QSSB_LOG_ERROR("If path_policies are specified, no_fs cannot be set to 1");
 			return -1;
-		#endif
+		}
 	}
 	return 0;
+}
+
+static void close_file_fds()
+{
+	long max_files = sysconf(_SC_OPEN_MAX);
+	for(long i = 3; i <= max_files; i++)
+	{
+		close((int)i);
+	}
+}
+
+/* Takes away file system access from the process
+ *
+ * We use this when "no_fs" is given in the policy.
+ *
+ * This is useful for restricted subprocesses that do some computational work
+ * and do not require filesystem access
+ *
+ * @returns: 0 on success, < 0 on error
+ */
+static int enable_no_fs(struct qssb_policy *policy)
+{
+		close_file_fds();
+
+		if(chdir("/proc/self/fdinfo") != 0)
+		{
+			QSSB_LOG_ERROR("Failed to change to safe directory: %s\n", strerror(errno));
+			return -1;
+		}
+
+		if(chroot(".") != 0)
+		{
+			QSSB_LOG_ERROR("Failed to chroot into safe directory: %s\n", strerror(errno));
+			return -1;
+		}
+
+		if(chdir("/") != 0)
+		{
+			QSSB_LOG_ERROR("Failed to chdir into safe directory inside chroot: %s\n", strerror(errno));
+			return -1;
+		}
+
+		if(policy->whitelisted_syscalls == NULL)
+		{
+			if(policy->blacklisted_syscalls == NULL)
+			{
+				policy->blacklisted_syscalls = fs_access_syscalls;
+			}
+			else
+			{
+				size_t nbl = 0;
+				size_t nfs = sizeof(fs_access_syscalls)/sizeof(fs_access_syscalls[0]);
+				int *tmp = policy->blacklisted_syscalls;
+				while(*tmp != -1)
+				{
+					++nbl;
+					++tmp;
+				}
+				size_t n = (nbl + nfs) + 1;
+				tmp = (int *) calloc(n, sizeof(int));
+				int *tmp_begin = tmp;
+				if(tmp == NULL)
+				{
+					QSSB_LOG_ERROR("Failed to expand blacklisted syscall array\n");
+					return -1;
+				}
+				memcpy(tmp, policy->blacklisted_syscalls, nbl*sizeof(int));
+				tmp+=nbl;
+				memcpy(tmp, fs_access_syscalls, nfs*sizeof(int));
+				tmp+=(nfs+1);
+				*tmp = -1;
+
+				policy->blacklisted_syscalls = tmp_begin;
+			}
+		}
+		return 0;
 }
 
 /* Enables the specified qssb_policy.
@@ -827,7 +941,6 @@ int qssb_enable_policy(struct qssb_policy *policy)
 		}
 	}
 #endif
-
 	if(policy->chdir_path == NULL)
 	{
 		policy->chdir_path = "/";
@@ -837,6 +950,25 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	{
 		QSSB_LOG_ERROR("chdir to %s failed\n", policy->chdir_path);
 		return -1;
+	}
+
+	if(policy->no_fs)
+	{
+		if(enable_no_fs(policy) != 0)
+		{
+			QSSB_LOG_ERROR("Failed to take away filesystem access of process\n");
+			return -1;
+		}
+	}
+
+	if(policy->no_new_fds)
+	{
+		const struct rlimit nofile = {0, 0};
+		if (setrlimit(RLIMIT_NOFILE, &nofile) == -1)
+		{
+			QSSB_LOG_ERROR("setrlimit: Failed to set rlimit: %s\n", strerror(errno));
+			return -1;
+		}
 	}
 
 	if(policy->drop_caps)
