@@ -577,7 +577,7 @@ static int seccomp_enable_blacklist(int *syscalls)
 }
 
 /*
- * Blacklists the specified systemcalls.
+ * Whitelists the specified systemcalls.
  *
  * syscalls: array of system calls numbers. -1 must be the last entry.
  */
