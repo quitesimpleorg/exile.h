@@ -157,7 +157,6 @@ static int default_blacklisted_syscals[] = {
 	QSSB_SYS(init_module),
 	QSSB_SYS(finit_module),
 	QSSB_SYS(delete_module),
-	-1
 };
 
 /* TODO: Check for completion
@@ -180,7 +179,6 @@ static int fs_access_syscalls[] = {
 	QSSB_SYS(open),
 	QSSB_SYS(openat),
 	QSSB_SYS(unlink),
-	-1
 };
 
 struct qssb_path_policy
@@ -189,6 +187,16 @@ struct qssb_path_policy
 	unsigned int policy;
 	struct qssb_path_policy *next;
 };
+
+struct qssb_allocated_entry
+{
+	void *data; /* the actual data */
+	size_t size; /* number of bytes allocated for size */
+	size_t used; /* number of bytes in use */
+};
+
+/* Number of bytes to grow the buffer in qssb_allocated_entry  with */
+#define QSSB_ENTRY_ALLOC_SIZE 32
 
 
 /* Policy tells qssb what to do */
@@ -212,7 +220,62 @@ struct qssb_policy
 	/* Do not manually add policies here, use qssb_append_path_polic*() */
 	struct qssb_path_policy *path_policies;
 	struct qssb_path_policy **path_policies_tail;
+
+	/* Do not manually add entries here, use qssb_append_denied_syscall() etc. */
+	struct qssb_allocated_entry denied_syscalls;
+	struct qssb_allocated_entry allowed_syscalls;
+
 };
+
+static int qssb_entry_append(struct qssb_allocated_entry *entry, void *data, size_t bytes)
+{
+	size_t remaining = entry->size - entry->used;
+	if(remaining < bytes)
+	{
+		size_t expandval = QSSB_ENTRY_ALLOC_SIZE > bytes ? QSSB_ENTRY_ALLOC_SIZE : bytes;
+		size_t sizenew = entry->size + expandval;
+		int *datanew = (int *) realloc(entry->data, sizenew);
+		if(datanew == NULL)
+		{
+			QSSB_LOG_ERROR("failed to resize array: %s\n", strerror(errno));
+			return -1;
+		}
+		entry->size = sizenew;
+		entry->data = datanew;
+	}
+	uint8_t *target = (uint8_t *) entry->data;
+	memcpy(target + entry->used, data, bytes);
+	entry->used = entry->used + bytes;
+	return 0;
+}
+
+static int qssb_append_syscall(struct qssb_allocated_entry *entry, int *syscalls, size_t n)
+{
+	return qssb_entry_append(entry, syscalls, n * sizeof(int));
+}
+
+
+int qssb_append_denied_syscall(struct qssb_policy *qssb_policy, int syscall)
+{
+	return qssb_append_syscall(&qssb_policy->denied_syscalls, &syscall, 1);
+}
+
+int qssb_append_allowed_syscall(struct qssb_policy *qssb_policy, int syscall)
+{
+	return qssb_append_syscall(&qssb_policy->allowed_syscalls, &syscall, 1);
+}
+
+int qssb_append_allowed_syscalls(struct qssb_policy *qssb_policy, int *syscalls, size_t n)
+{
+
+	return qssb_append_syscall(&qssb_policy->allowed_syscalls, syscalls, n);
+}
+
+int qssb_append_denied_syscalls(struct qssb_policy *qssb_policy, int *syscalls, size_t n)
+{
+
+	return qssb_append_syscall(&qssb_policy->denied_syscalls, syscalls, n);
+}
 
 /* Creates the default policy
  * Must be freed using qssb_free_policy
@@ -232,6 +295,20 @@ struct qssb_policy *qssb_init_policy()
 	result->chroot_target_path[0] = '\0';
 	result->path_policies = NULL;
 	result->path_policies_tail = &(result->path_policies);
+	result->allowed_syscalls.data = NULL;
+	result->allowed_syscalls.size = 0;
+	result->allowed_syscalls.used = 0;
+	result->denied_syscalls.data = NULL;
+	result->denied_syscalls.size = 0;
+	result->denied_syscalls.used = 0;
+
+	size_t blacklisted_syscalls_count = sizeof(default_blacklisted_syscals)/sizeof(default_blacklisted_syscals[0]);
+
+	int appendresult = qssb_append_denied_syscalls(result, default_blacklisted_syscals, blacklisted_syscalls_count);
+	if(appendresult != 0)
+	{
+		return NULL;
+	}
 	return result;
 }
 
