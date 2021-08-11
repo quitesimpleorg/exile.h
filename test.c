@@ -15,9 +15,11 @@ int test_default_main(int argc, char *argv[])
 int test_both_syscalls(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
-	int bla[] = { 1,2,3};
-	policy->blacklisted_syscalls = &bla;
-	policy->whitelisted_syscalls = &bla;
+	int syscalls[] = {1,2,3};
+
+	qssb_append_denied_syscalls(policy, syscalls, 3);
+	qssb_append_allowed_syscalls(policy, syscalls, 3);
+
 	int ret = qssb_enable_policy(policy);
 	if(ret != 0)
 	{
@@ -29,8 +31,9 @@ int test_both_syscalls(int argc, char *argv[])
 int test_seccomp_blacklisted(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
-	int blacklisted[] = { QSSB_SYS(getuid) };
-	policy->blacklisted_syscalls = blacklisted;
+
+	qssb_append_denied_syscall(policy, QSSB_SYS(getuid));
+
 	int ret = qssb_enable_policy(policy);
 	uid_t pid = geteuid();
 	pid = getuid();
@@ -40,8 +43,9 @@ int test_seccomp_blacklisted(int argc, char *argv[])
 int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
-	int blacklisted[] = { QSSB_SYS(getuid) };
-	policy->blacklisted_syscalls = blacklisted;
+
+	qssb_append_denied_syscall(policy, QSSB_SYS(getuid));
+
 	int ret = qssb_enable_policy(policy);
 	//geteuid is not blacklisted, so must succeed
 	uid_t pid = geteuid();

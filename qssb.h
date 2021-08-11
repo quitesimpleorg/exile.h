@@ -212,8 +212,6 @@ struct qssb_policy
 	/* Bind mounts all paths in path_policies into the chroot and applies
 	 non-landlock policies */
 	int mount_path_policies_to_chroot;
-	int *blacklisted_syscalls;
-	int *whitelisted_syscalls;
 	char chroot_target_path[PATH_MAX];
 	const char *chdir_path;
 
@@ -283,7 +281,6 @@ int qssb_append_denied_syscalls(struct qssb_policy *qssb_policy, int *syscalls, 
 struct qssb_policy *qssb_init_policy()
 {
 	struct qssb_policy *result = (struct qssb_policy *) calloc(1, sizeof(struct qssb_policy));
-	result->blacklisted_syscalls = default_blacklisted_syscals;
 	result->drop_caps = 1;
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
@@ -632,13 +629,13 @@ static int drop_caps()
 /*
  * Enables the per_syscall seccomp action for system calls
  *
- * syscalls: array of system calls numbers. -1 must be the last entry.
+ * syscalls: array of system calls numbers.
  * per_syscall: action to apply for each system call
  * default_action: the default action at the end
  *
  * @returns: 0 on success, -1 on error
  */
-static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int default_action)
+static int seccomp_enable(int *syscalls, size_t n, unsigned int per_syscall, unsigned int default_action)
 {
 	struct sock_filter filter[1024] =
 	{
@@ -646,15 +643,13 @@ static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int 
 	};
 
 	unsigned short int current_filter_index = 1;
-	while(*syscalls >= 0)
+	for(size_t i = 0; i < n; i++)
 	{
-		unsigned int sysc = (unsigned int) *syscalls;
+		unsigned int sysc = (unsigned int) syscalls[i];
 		struct sock_filter syscall = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, sysc, 0, 1);
 		struct sock_filter action = BPF_STMT(BPF_RET+BPF_K, per_syscall);
 		filter[current_filter_index++] = syscall;
 		filter[current_filter_index++] = action;
-
-		++syscalls;
 	}
 
 	struct sock_filter da = BPF_STMT(BPF_RET+BPF_K, default_action);
@@ -678,21 +673,21 @@ static int seccomp_enable(int *syscalls, unsigned int per_syscall, unsigned int 
 /*
  * Blacklists the specified systemcalls.
  *
- * syscalls: array of system calls numbers. -1 must be the last entry.
+ * syscalls: array of system calls numbers.
  */
-static int seccomp_enable_blacklist(int *syscalls)
+static int seccomp_enable_blacklist(int *syscalls, size_t n)
 {
-	return seccomp_enable(syscalls, SECCOMP_RET_KILL, SECCOMP_RET_ALLOW);
+	return seccomp_enable(syscalls, n, SECCOMP_RET_KILL, SECCOMP_RET_ALLOW);
 }
 
 /*
  * Whitelists the specified systemcalls.
  *
- * syscalls: array of system calls numbers. -1 must be the last entry.
+ * syscalls: array of system calls numbers.
  */
-static int seccomp_enable_whitelist(int *syscalls)
+static int seccomp_enable_whitelist(int *syscalls, size_t n)
 {
-	return seccomp_enable(syscalls, SECCOMP_RET_ALLOW, SECCOMP_RET_KILL);
+	return seccomp_enable(syscalls, n, SECCOMP_RET_ALLOW, SECCOMP_RET_KILL);
 }
 
 #if HAVE_LANDLOCK == 1
@@ -814,9 +809,9 @@ static int landlock_prepare_ruleset(struct qssb_path_policy *policies)
 /* Checks for illogical or dangerous combinations */
 static int check_policy_sanity(struct qssb_policy *policy)
 {
-	if(policy->blacklisted_syscalls != NULL && policy->whitelisted_syscalls != NULL)
+	if(policy->denied_syscalls.used > 0 && policy->allowed_syscalls.used > 0)
 	{
-		QSSB_LOG_ERROR("Error: Cannot mix blacklisted and whitelisted systemcalls\n");
+		QSSB_LOG_ERROR("Error: Cannot mix allowed and denied systemcalls in policy\n");
 		return -EINVAL;
 	}
 
@@ -836,7 +831,7 @@ static int check_policy_sanity(struct qssb_policy *policy)
 
 	if(policy->no_new_privs != 1)
 	{
-		if(policy->blacklisted_syscalls != NULL || policy->whitelisted_syscalls != NULL)
+		if(policy->allowed_syscalls.used > 0 || policy->denied_syscalls.used > 0)
 		{
 			QSSB_LOG_ERROR("no_new_privs = 1 is required for seccomp filtering!\n");
 			return -1;
@@ -902,37 +897,15 @@ static int enable_no_fs(struct qssb_policy *policy)
 			return -1;
 		}
 
-		if(policy->whitelisted_syscalls == NULL)
+		if(policy->allowed_syscalls.used == 0)
 		{
-			if(policy->blacklisted_syscalls == NULL)
-			{
-				policy->blacklisted_syscalls = fs_access_syscalls;
-			}
-			else
-			{
-				size_t nbl = 0;
-				size_t nfs = sizeof(fs_access_syscalls)/sizeof(fs_access_syscalls[0]);
-				int *tmp = policy->blacklisted_syscalls;
-				while(*tmp != -1)
-				{
-					++nbl;
-					++tmp;
-				}
-				size_t n = (nbl + nfs) + 1;
-				tmp = (int *) calloc(n, sizeof(int));
-				int *tmp_begin = tmp;
-				if(tmp == NULL)
-				{
-					QSSB_LOG_ERROR("Failed to expand blacklisted syscall array\n");
-					return -1;
-				}
-				memcpy(tmp, policy->blacklisted_syscalls, nbl*sizeof(int));
-				tmp+=nbl;
-				memcpy(tmp, fs_access_syscalls, nfs*sizeof(int));
-				tmp+=(nfs+1);
-				*tmp = -1;
+			size_t fs_access_syscalls_count = sizeof(fs_access_syscalls)/sizeof(fs_access_syscalls[0]);
 
-				policy->blacklisted_syscalls = tmp_begin;
+			int ret = qssb_append_denied_syscalls(policy, fs_access_syscalls, fs_access_syscalls_count);
+			if(ret != 0)
+			{
+				QSSB_LOG_ERROR("Failed to add system calls to blacklist\n");
+				return -1;
 			}
 		}
 		return 0;
@@ -1085,18 +1058,22 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	close(landlock_ruleset_fd);
 #endif
 
-	if(policy->whitelisted_syscalls != NULL)
+	if(policy->allowed_syscalls.used > 0)
 	{
-		if(seccomp_enable_whitelist(policy->whitelisted_syscalls) <0)
+		int *syscalls = (int *)policy->allowed_syscalls.data;
+		size_t n = policy->allowed_syscalls.used / sizeof(int);
+		if(seccomp_enable_whitelist(syscalls, n) < 0)
 		{
 			QSSB_LOG_ERROR("seccomp_enable_whitelist failed\n");
 			return -1;
 		}
 	}
 
-	if(policy->blacklisted_syscalls != NULL)
+	if(policy->denied_syscalls.used > 0)
 	{
-		if(seccomp_enable_blacklist(policy->blacklisted_syscalls) <0)
+		int *syscalls = (int *)policy->denied_syscalls.data;
+		size_t n = policy->denied_syscalls.used / sizeof(int);
+		if(seccomp_enable_blacklist(syscalls, n) < 0)
 		{
 			QSSB_LOG_ERROR("seccomp_enable_blacklist failed\n");
 			return -1;
