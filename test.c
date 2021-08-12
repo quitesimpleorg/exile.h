@@ -52,6 +52,18 @@ int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
 	return 0;
 }
 
+int test_seccomp_x32_kill(int argc, char *argv[])
+{
+	struct qssb_policy *policy = qssb_init_policy();
+
+	qssb_append_denied_syscall(policy, QSSB_SYS(getuid));
+
+	int ret = qssb_enable_policy(policy);
+
+	/* Attempt to bypass by falling back to x32 should be blocked */
+	syscall(QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
+	return 0;
+}
 int test_landlock(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -148,6 +160,7 @@ struct dispatcher dispatchers[] = {
 	{ "default", &test_default_main, true },
 	{ "seccomp-blacklisted", &test_seccomp_blacklisted, false },
 	{ "seccomp-blacklisted-permitted", &test_seccomp_blacklisted_call_permitted, true },
+	{ "seccomp-x32-kill", &test_seccomp_x32_kill, false},
 	{ "landlock", &test_landlock, true },
 	{ "landlock-deny-write", &test_landlock_deny_write, true },
 	{ "no_fs", &test_nofs, false},
