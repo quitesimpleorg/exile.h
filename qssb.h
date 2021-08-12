@@ -40,6 +40,7 @@
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <linux/version.h>
+#include <linux/audit.h>
 #include <sys/capability.h>
 #include <stddef.h>
 #include <inttypes.h>
@@ -58,17 +59,18 @@
 	#endif
 #endif
 
-//TODO: stolen from kernel samples/seccomp, GPLv2...?
-#define ALLOW \
-	BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW)
-#define DENY \
-	BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL)
+
+#if defined(__i386__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_I386
+#elif defined(__x86_64__)
+#define SECCOMP_AUDIT_ARCH AUDIT_ARCH_X86_64
+#else
+#warning Seccomp support has not been tested for qssb.h for this platform yet
+#endif
+
 #define SYSCALL(nr, jt) \
 	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, (nr), 0, 1), jt
 
-#define LOAD_SYSCALL_NR \
-	BPF_STMT(BPF_LD+BPF_W+BPF_ABS, \
-		 offsetof(struct seccomp_data, nr))
 
 #define QSSB_UNSHARE_NETWORK 1<<1
 #define QSSB_UNSHARE_USER 1<<2
@@ -639,10 +641,13 @@ static int seccomp_enable(int *syscalls, size_t n, unsigned int per_syscall, uns
 {
 	struct sock_filter filter[1024] =
 	{
-		LOAD_SYSCALL_NR,
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS,offsetof(struct seccomp_data, arch)),
+		BPF_JUMP (BPF_JMP+BPF_JEQ+BPF_K, SECCOMP_AUDIT_ARCH, 1, 0),
+		BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL_PROCESS),
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, offsetof(struct seccomp_data, nr)),
 	};
 
-	unsigned short int current_filter_index = 1;
+	unsigned short int current_filter_index = 4;
 	for(size_t i = 0; i < n; i++)
 	{
 		unsigned int sysc = (unsigned int) syscalls[i];
