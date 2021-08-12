@@ -677,7 +677,7 @@ static int seccomp_enable(int *syscalls, size_t n, unsigned int per_syscall, uns
  */
 static int seccomp_enable_blacklist(int *syscalls, size_t n)
 {
-	return seccomp_enable(syscalls, n, SECCOMP_RET_KILL, SECCOMP_RET_ALLOW);
+	return seccomp_enable(syscalls, n, SECCOMP_RET_KILL_PROCESS, SECCOMP_RET_ALLOW);
 }
 
 /*
@@ -687,7 +687,7 @@ static int seccomp_enable_blacklist(int *syscalls, size_t n)
  */
 static int seccomp_enable_whitelist(int *syscalls, size_t n)
 {
-	return seccomp_enable(syscalls, n, SECCOMP_RET_ALLOW, SECCOMP_RET_KILL);
+	return seccomp_enable(syscalls, n, SECCOMP_RET_ALLOW, SECCOMP_RET_KILL_PROCESS);
 }
 
 #if HAVE_LANDLOCK == 1
