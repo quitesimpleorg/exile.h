@@ -12,27 +12,11 @@ int test_default_main(int argc, char *argv[])
 	return ret;
 }
 
-int test_both_syscalls(int argc, char *argv[])
-{
-	struct qssb_policy *policy = qssb_init_policy();
-	int syscalls[] = {1,2,3};
-
-	qssb_append_denied_syscalls(policy, syscalls, 3);
-	qssb_append_allowed_syscalls(policy, syscalls, 3);
-
-	int ret = qssb_enable_policy(policy);
-	if(ret != 0)
-	{
-		return 0;
-	}
-	return 1;
-}
-
 int test_seccomp_blacklisted(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
-
-	qssb_append_denied_syscall(policy, QSSB_SYS(getuid));
+	
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 
 	int ret = qssb_enable_policy(policy);
 	uid_t pid = geteuid();
@@ -44,7 +28,7 @@ int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
 
-	qssb_append_denied_syscall(policy, QSSB_SYS(getuid));
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 
 	int ret = qssb_enable_policy(policy);
 	//geteuid is not blacklisted, so must succeed
@@ -56,12 +40,13 @@ int test_seccomp_x32_kill(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
 
-	qssb_append_denied_syscall(policy, QSSB_SYS(getuid));
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 
 	int ret = qssb_enable_policy(policy);
 
 	/* Attempt to bypass by falling back to x32 should be blocked */
-	syscall(QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
+
 	return 0;
 }
 int test_landlock(int argc, char *argv[])
