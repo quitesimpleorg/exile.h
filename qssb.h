@@ -227,6 +227,7 @@ struct qssb_policy
 	int no_fs;
 	int no_new_fds;
 	int namespace_options;
+	int disable_syscall_filter;
 	/* Bind mounts all paths in path_policies into the chroot and applies
 	 non-landlock policies */
 	int mount_path_policies_to_chroot;
@@ -320,6 +321,7 @@ int qssb_append_syscalls_policy(struct qssb_policy *qssb_policy, unsigned int sy
 	*(qssb_policy->syscall_policies_tail) = newpolicy;
 	qssb_policy->syscall_policies_tail = &(newpolicy->next);
 
+	qssb_policy->disable_syscall_filter = 0;
 	return 0;
 }
 
@@ -345,6 +347,7 @@ struct qssb_policy *qssb_init_policy()
 	result->no_fs = 0;
 	result->no_new_fds = 0;
 	result->namespace_options = QSSB_UNSHARE_MOUNT | QSSB_UNSHARE_USER;
+	result->disable_syscall_filter = 0;
 	result->chdir_path = NULL;
 	result->mount_path_policies_to_chroot = 0;
 	result->chroot_target_path[0] = '\0';
@@ -354,15 +357,6 @@ struct qssb_policy *qssb_init_policy()
 	result->syscall_policies = NULL;
 	result->syscall_policies_tail = &(result->syscall_policies);
 
-
-	size_t blacklisted_syscalls_count = sizeof(default_blacklisted_syscalls)/sizeof(default_blacklisted_syscalls[0]);
-
-
-	int appendresult = qssb_append_syscalls_policy(result, QSSB_SYSCALL_DENY_KILL_PROCESS, default_blacklisted_syscalls, blacklisted_syscalls_count);
-	if(appendresult != 0)
-	{
-		return NULL;
-	}
 	return result;
 }
 
@@ -989,6 +983,23 @@ static int enable_no_fs(struct qssb_policy *policy)
 		return 0;
 }
 
+static int qssb_append_default_syscall_policy(struct qssb_policy *policy)
+{
+	size_t blacklisted_syscalls_count = sizeof(default_blacklisted_syscalls)/sizeof(default_blacklisted_syscalls[0]);
+
+	int appendresult = qssb_append_syscalls_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, default_blacklisted_syscalls, blacklisted_syscalls_count);
+	if(appendresult != 0)
+	{
+		return 1;
+	}
+	appendresult = qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+	if(appendresult != 0)
+	{
+		return 1;
+	}
+	return 0;
+}
+
 /* Enables the specified qssb_policy.
  *
  * This function is not atomic (and can't be). This means some
@@ -1136,10 +1147,20 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	close(landlock_ruleset_fd);
 #endif
 
+	if(policy->syscall_policies == NULL && policy->disable_syscall_filter == 0)
+	{
+			if(qssb_append_default_syscall_policy(policy) != 0)
+			{
+				QSSB_LOG_ERROR("Failed to add default syscall policy\n");
+				return -1;
+			}
+	}
+
 	if(policy->syscall_policies != NULL)
 	{
 		return qssb_enable_syscall_policy(policy);
 	}
+
 	return 0;
 }
 #endif
