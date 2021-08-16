@@ -928,6 +928,45 @@ static int check_policy_sanity(struct qssb_policy *policy)
 			return -1;
 		}
 	}
+
+	struct qssb_syscall_policy *syscall_policy = policy->syscall_policies;
+	if(syscall_policy != NULL)
+	{
+		/* A few sanitiy checks... but we cannot check overall whether it's reasonable */
+		int i = 0;
+		int last_match_all = -1;
+		int match_all_policy = 0;
+		int last_policy;
+		while(syscall_policy)
+		{
+			long *syscall;
+			size_t n = 0;
+			get_syscall_array(syscall_policy, &syscall, &n);
+			if(syscall[n-1] == QSSB_SYSCALL_MATCH_ALL)
+			{
+				last_match_all = i;
+				match_all_policy = syscall_policy->policy;
+			}
+			else
+			{
+				last_policy = syscall_policy->policy;
+			}
+			syscall_policy = syscall_policy->next;
+			++i;
+		}
+		if(last_match_all == -1 || i - last_match_all != 1)
+		{
+			QSSB_LOG_ERROR("The last entry in the syscall policy list must match all syscalls (default rule)\n");
+			return -1;
+		}
+		/* Most likely a mistake and not intended */
+		if(last_policy == match_all_policy)
+		{
+			QSSB_LOG_ERROR("Last policy for a syscall matches default policy\n");
+			return -1;
+		}
+	}
+
 	return 0;
 }
 
