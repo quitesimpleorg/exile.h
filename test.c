@@ -5,6 +5,17 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+int xqssb_enable_policy(struct qssb_policy *policy)
+{
+	int ret = qssb_enable_policy(policy);
+	if(ret != 0)
+	{
+		fprintf(stderr, "qssb_enable_policy() failed: %i\n", ret);
+		exit(EXIT_FAILURE);
+	}
+	return 0;
+}
+
 int test_default_main(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -15,10 +26,12 @@ int test_default_main(int argc, char *argv[])
 int test_seccomp_blacklisted(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
-	
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 
-	int ret = qssb_enable_policy(policy);
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
+	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+
+	xqssb_enable_policy(policy);
+
 	uid_t pid = geteuid();
 	pid = getuid();
 	return 0;
@@ -41,14 +54,31 @@ int test_seccomp_x32_kill(int argc, char *argv[])
 	struct qssb_policy *policy = qssb_init_policy();
 
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
+	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
 
 	int ret = qssb_enable_policy(policy);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Error: Enabling is expected to succeed. Returning 0 to indicate failure of this test\n");
+		return 0;
+	}
 
 	/* Attempt to bypass by falling back to x32 should be blocked */
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
+	syscall(QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
 
 	return 0;
 }
+
+/* Tests whether seccomp rules end with a policy matching all syscalls */
+int test_seccomp_require_last_matchall(int argc, char *argv[])
+{
+	struct qssb_policy *policy = qssb_init_policy();
+
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
+
+	return qssb_enable_policy(policy);
+}
+
 int test_landlock(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -146,6 +176,7 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-blacklisted", &test_seccomp_blacklisted, false },
 	{ "seccomp-blacklisted-permitted", &test_seccomp_blacklisted_call_permitted, true },
 	{ "seccomp-x32-kill", &test_seccomp_x32_kill, false},
+	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall, false},
 	{ "landlock", &test_landlock, true },
 	{ "landlock-deny-write", &test_landlock_deny_write, true },
 	{ "no_fs", &test_nofs, false},
