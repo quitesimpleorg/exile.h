@@ -4,6 +4,8 @@
 ## Status
 No release yet, expiremental, API is unstable, builds will break on updates of this library. 
 
+Currently, it's mainly evolving according to the needs of my other projects. 
+
 ## Features
 
   - Systemcall filtering (using seccomp-bpf)
@@ -36,7 +38,7 @@ the library may check against that. Execute
 `echo 1 > /proc/sys/kernel/unprivileged_userns_clone` to disable that patch for now.
 
 ### Examples
-
+  - looqs: https://gitea.quitesimple.org/crtxcr/looqs
   - qswiki: https://gitea.quitesimple.org/crtxcr/qswiki
   - cgit sandboxed: https://gitea.quitesimple.org/crtxcr/cgitsb
   - qpdfviewsb sandboxed (quick and dirty): https://gitea.quitesimple.org/crtxcr/qpdfviewsb
