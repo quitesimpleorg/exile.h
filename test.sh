@@ -38,14 +38,14 @@ function runtest()
 	echo "Running: $testname. Date: $(date)" > "${test_log_file}"
 
 	echo -n "Running $1... "
-	#exit 1 to suppress shell message like "./test.sh: line 18: pid Bad system call"
-	(./test $1 || exit 1) &>> "${test_log_file}"
+	#exit $? to suppress shell message like "./test.sh: line 18: pid Bad system call"
+	(./test $1 || exit $?) &>> "${test_log_file}"
 	ret=$?
-	SUCCESS=0
+	SUCCESS="no"
 	if [ $must_exit_zero -eq 1 ] ; then
 		if [ $ret -eq 0 ] ; then
 			runtest_success
-			SUCCESS=1
+			SUCCESS="yes"
 		else
 			runtest_fail
 		fi
@@ -54,11 +54,11 @@ function runtest()
 			runtest_fail
 		else
 			runtest_success
-			SUCCESS=1
+			SUCCESS="yes"
 		fi
 	fi
 
-	echo "Finished: ${testname}. Date: $(date). Success: $SUCCESS" >> "${test_log_file}"
+	echo "Finished: ${testname}. Date: $(date). Return code: $ret. Success: $SUCCESS" >> "${test_log_file}"
 
 }
 
