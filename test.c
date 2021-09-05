@@ -4,6 +4,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 
 int xqssb_enable_policy(struct qssb_policy *policy)
 {
@@ -23,10 +24,70 @@ int test_default_main(int argc, char *argv[])
 	return ret;
 }
 
-int test_seccomp_blacklisted(int argc, char *argv[])
+static int test_expected_kill(int (*f)())
+{
+	pid_t pid = fork();
+	if(pid == 0)
+	{
+		return f();
+	}
+	int status = 0;
+	waitpid(pid, &status, 0);
+
+	if(WIFSIGNALED(status))
+	{
+		int c = WTERMSIG(status);
+		if(c == SIGSYS)
+		{
+			printf("Got expected signal\n");
+			return 0;
+		}
+		printf("Unexpected status code: %i\n", c);
+		return 1;
+	}
+	else
+	{
+		int c = WEXITSTATUS(status);
+		printf("Process was not killed, test fails. Status code of exit: %i\n", c);
+		return 1;
+	}
+	return 0;
+}
+
+
+static int test_successful_exit(int (*f)())
+{
+	pid_t pid = fork();
+	if(pid == 0)
+	{
+		return f();
+	}
+	int status = 0;
+	waitpid(pid, &status, 0);
+
+	if(WIFSIGNALED(status))
+	{
+		int c = WTERMSIG(status);
+		printf("Received signal, which was not expected. Signal was: %i\n", c);
+		return 1;
+	}
+	else
+	{
+		int c = WEXITSTATUS(status);
+		if(c != 0)
+		{
+			printf("Process failed to exit properly. Status code is: %i\n", c);
+		}
+		return c;
+	}
+	printf("Process exited sucessfully as expected");
+	return 0;
+}
+
+
+static int do_test_seccomp_blacklisted()
 {
 	struct qssb_policy *policy = qssb_init_policy();
-
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
 
@@ -35,9 +96,16 @@ int test_seccomp_blacklisted(int argc, char *argv[])
 	uid_t pid = geteuid();
 	pid = getuid();
 	return 0;
+
+
+}
+int test_seccomp_blacklisted(int argc, char *argv[])
+{
+	return test_expected_kill(&do_test_seccomp_blacklisted);
 }
 
-int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
+
+static int do_test_seccomp_blacklisted_call_permitted()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 
@@ -50,24 +118,30 @@ int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
 	return 0;
 }
 
-int test_seccomp_x32_kill(int argc, char *argv[])
+
+int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
+{
+	return test_successful_exit(&do_test_seccomp_blacklisted_call_permitted);
+}
+
+static int do_test_seccomp_x32_kill()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
 
-	int ret = qssb_enable_policy(policy);
-	if(ret != 0)
-	{
-		fprintf(stderr, "Error: Enabling is expected to succeed. Returning 0 to indicate failure of this test\n");
-		return 0;
-	}
+	xqssb_enable_policy(policy);
 
 	/* Attempt to bypass by falling back to x32 should be blocked */
 	syscall(QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
 
 	return 0;
+}
+
+int test_seccomp_x32_kill(int argc, char *argv[])
+{
+	return test_expected_kill(&do_test_seccomp_x32_kill);
 }
 
 /* Tests whether seccomp rules end with a policy matching all syscalls */
@@ -77,13 +151,18 @@ int test_seccomp_require_last_matchall(int argc, char *argv[])
 
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 
-	return qssb_enable_policy(policy);
+	int status = qssb_enable_policy(policy);
+	if(status == 0)
+	{
+		printf("Failed. Should not have been enabled!");
+		return 1;
+	}
+	return 0;
 }
 
-int test_seccomp_errno(int argc, char *argv[])
+static int do_test_seccomp_errno()
 {
 	struct qssb_policy *policy = qssb_init_policy();
-	policy->not_dumpable = 0;
 
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_RET_ERROR, QSSB_SYS(close));
 	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
@@ -94,6 +173,13 @@ int test_seccomp_errno(int argc, char *argv[])
 	int fd = close(0);
 	printf("close() return code: %i, errno: %s\n", fd, strerror(errno));
 	return fd == -1 ? 0 : 1;
+}
+
+
+
+int test_seccomp_errno(int argc, char *argv[])
+{
+	return test_successful_exit(&do_test_seccomp_errno);
 }
 
 int test_landlock(int argc, char *argv[])
@@ -138,14 +224,14 @@ int test_nofs(int argc, char *argv[])
 	if(s == -1)
 	{
 		fprintf(stderr, "Failed to open socket but this was not requested by policy\n");
-		return 0;
+		return 1;
 	}
 
 	/* Expect seccomp to take care of this */
 	if(open("/test", O_CREAT | O_WRONLY) >= 0)
 	{
-		fprintf(stderr, "Failed: Do not expect write access\n");
-		return -1;
+		fprintf(stderr, "Failed: We do not expect write access\n");
+		return 1;
 	}
 
 	return 0;
@@ -185,25 +271,23 @@ struct dispatcher
 {
 	char *name;
 	int (*f)(int, char **);
-	bool must_exit_zero;
 };
 
 struct dispatcher dispatchers[] = {
-	{ "default", &test_default_main, true },
-	{ "seccomp-blacklisted", &test_seccomp_blacklisted, false },
-	{ "seccomp-blacklisted-permitted", &test_seccomp_blacklisted_call_permitted, true },
-	{ "seccomp-x32-kill", &test_seccomp_x32_kill, false},
-	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall, false},
-	{ "seccomp-errno", &test_seccomp_errno, true},
-	{ "landlock", &test_landlock, true },
-	{ "landlock-deny-write", &test_landlock_deny_write, true },
-	{ "no_fs", &test_nofs, false},
-	{ "no_new_fds", &test_no_new_fds, true}
+	{ "default", &test_default_main },
+	{ "seccomp-blacklisted", &test_seccomp_blacklisted},
+	{ "seccomp-blacklisted-permitted", &test_seccomp_blacklisted_call_permitted},
+	{ "seccomp-x32-kill", &test_seccomp_x32_kill},
+	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall},
+	{ "seccomp-errno", &test_seccomp_errno},
+	{ "landlock", &test_landlock},
+	{ "landlock-deny-write", &test_landlock_deny_write },
+	{ "no_fs", &test_nofs},
+	{ "no_new_fds", &test_no_new_fds}
 };
 
 int main(int argc, char *argv[])
 {
-
 	if(argc < 2)
 	{
 		fprintf(stderr, "Usage: %s [testname]\n", argv[0]);
@@ -214,7 +298,7 @@ int main(int argc, char *argv[])
 	{
 		for(unsigned int i = 0; i < sizeof(dispatchers)/sizeof(dispatchers[0]); i++)
 		{
-			printf("%s:%i\n", dispatchers[i].name, dispatchers[i].must_exit_zero ? 1 : 0);
+			printf("%s\n", dispatchers[i].name);
 		}
 		return EXIT_SUCCESS;
 	}

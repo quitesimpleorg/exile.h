@@ -32,8 +32,7 @@ function runtest_success()
 function runtest()
 {
 	testname="$1"
-	must_exit_zero="$2"
-	test_log_file="$3"
+	test_log_file="$2"
 
 	echo "Running: $testname. Date: $(date)" > "${test_log_file}"
 
@@ -42,24 +41,14 @@ function runtest()
 	(./test $1 || exit $?) &>> "${test_log_file}"
 	ret=$?
 	SUCCESS="no"
-	if [ $must_exit_zero -eq 1 ] ; then
-		if [ $ret -eq 0 ] ; then
-			runtest_success
-			SUCCESS="yes"
-		else
-			runtest_fail
-		fi
+	if [ $ret -eq 0 ] ; then
+		runtest_success
+		SUCCESS="yes"
 	else
-		if [ $ret -eq 0 ] ; then
-			runtest_fail
-		else
-			runtest_success
-			SUCCESS="yes"
-		fi
+		runtest_fail
 	fi
 
-	echo "Finished: ${testname}. Date: $(date). Return code: $ret. Success: $SUCCESS" >> "${test_log_file}"
-
+	echo "Finished: ${testname}. Date: $(date). Success: $SUCCESS" >> "${test_log_file}"
 }
 
 GIT_ID=$( git log --pretty="format:%h" -n1 )
@@ -73,9 +62,8 @@ LOG_OUTPUT_DIR_PATH="${LOG_OUTPUT_DIR}/qssb_test_${GIT_ID}_${TIMESTAMP}"
 [ -d "$LOG_OUTPUT_DIR_PATH" ] || mkdir -p "$LOG_OUTPUT_DIR_PATH"
 
 for test in $( ./test --dumptests ) ; do
-	testname=$( echo $test | cut -d":" -f1 )
-	must_exit_zero=$( echo "$test" | cut -d":" -f2 )
-	runtest "$testname" $must_exit_zero "${LOG_OUTPUT_DIR_PATH}/log.${testname}"
+	testname=$( echo $test )
+	runtest "$testname" "${LOG_OUTPUT_DIR_PATH}/log.${testname}"
 done
 echo
 echo "Tests finished. Logs in $(realpath ${LOG_OUTPUT_DIR_PATH})"
