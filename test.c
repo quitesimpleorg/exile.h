@@ -17,7 +17,7 @@ int xqssb_enable_policy(struct qssb_policy *policy)
 	return 0;
 }
 
-int test_default_main(int argc, char *argv[])
+int test_default_main()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	int ret = qssb_enable_policy(policy);
@@ -99,7 +99,7 @@ static int do_test_seccomp_blacklisted()
 
 
 }
-int test_seccomp_blacklisted(int argc, char *argv[])
+int test_seccomp_blacklisted()
 {
 	return test_expected_kill(&do_test_seccomp_blacklisted);
 }
@@ -119,7 +119,7 @@ static int do_test_seccomp_blacklisted_call_permitted()
 }
 
 
-int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
+int test_seccomp_blacklisted_call_permitted()
 {
 	return test_successful_exit(&do_test_seccomp_blacklisted_call_permitted);
 }
@@ -139,13 +139,13 @@ static int do_test_seccomp_x32_kill()
 	return 0;
 }
 
-int test_seccomp_x32_kill(int argc, char *argv[])
+int test_seccomp_x32_kill()
 {
 	return test_expected_kill(&do_test_seccomp_x32_kill);
 }
 
 /* Tests whether seccomp rules end with a policy matching all syscalls */
-int test_seccomp_require_last_matchall(int argc, char *argv[])
+int test_seccomp_require_last_matchall()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 
@@ -177,12 +177,12 @@ static int do_test_seccomp_errno()
 
 
 
-int test_seccomp_errno(int argc, char *argv[])
+int test_seccomp_errno()
 {
 	return test_successful_exit(&do_test_seccomp_errno);
 }
 
-int test_landlock(int argc, char *argv[])
+int test_landlock()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	qssb_append_path_policy(policy, QSSB_FS_ALLOW_READ, "/proc/self/fd");
@@ -195,7 +195,7 @@ int test_landlock(int argc, char *argv[])
 	return 1;
 }
 
-int test_landlock_deny_write(int argc, char *argv[])
+int test_landlock_deny_write()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	qssb_append_path_policy(policy, QSSB_FS_ALLOW_READ, "/tmp/");
@@ -208,7 +208,7 @@ int test_landlock_deny_write(int argc, char *argv[])
 	return 1;
 }
 
-int test_nofs(int argc, char *argv[])
+int test_nofs()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	policy->no_fs = 1;
@@ -238,7 +238,7 @@ int test_nofs(int argc, char *argv[])
 }
 
 
-int test_no_new_fds(int argc, char *argv[])
+int test_no_new_fds()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	policy->no_new_fds = 1;
@@ -270,7 +270,7 @@ int test_no_new_fds(int argc, char *argv[])
 struct dispatcher
 {
 	char *name;
-	int (*f)(int, char **);
+	int (*f)();
 };
 
 struct dispatcher dispatchers[] = {
@@ -308,7 +308,7 @@ int main(int argc, char *argv[])
 		struct dispatcher *current = &dispatchers[i];
 		if(strcmp(current->name, test) == 0)
 		{
-			return current->f(argc, argv);
+			return current->f();
 		}
 	}
 	fprintf(stderr, "Unknown test\n");
