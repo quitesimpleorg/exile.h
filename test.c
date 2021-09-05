@@ -80,6 +80,22 @@ int test_seccomp_require_last_matchall(int argc, char *argv[])
 	return qssb_enable_policy(policy);
 }
 
+int test_seccomp_errno(int argc, char *argv[])
+{
+	struct qssb_policy *policy = qssb_init_policy();
+	policy->not_dumpable = 0;
+
+	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_RET_ERROR, QSSB_SYS(close));
+	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+
+	xqssb_enable_policy(policy);
+	uid_t id = getuid();
+
+	int fd = close(0);
+	printf("close() return code: %i, errno: %s\n", fd, strerror(errno));
+	return fd == -1 ? 0 : 1;
+}
+
 int test_landlock(int argc, char *argv[])
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -178,6 +194,7 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-blacklisted-permitted", &test_seccomp_blacklisted_call_permitted, true },
 	{ "seccomp-x32-kill", &test_seccomp_x32_kill, false},
 	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall, false},
+	{ "seccomp-errno", &test_seccomp_errno, true},
 	{ "landlock", &test_landlock, true },
 	{ "landlock-deny-write", &test_landlock_deny_write, true },
 	{ "no_fs", &test_nofs, false},
