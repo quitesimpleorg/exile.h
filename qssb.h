@@ -1022,7 +1022,7 @@ static int enable_no_fs(struct qssb_policy *policy)
 		return 0;
 }
 
-static int qssb_append_default_syscall_policy(struct qssb_policy *policy)
+static int qssb_append_predefined_standard_syscall_policy(struct qssb_policy *policy)
 {
 	size_t blacklisted_syscalls_count = sizeof(default_blacklisted_syscalls)/sizeof(default_blacklisted_syscalls[0]);
 
@@ -1188,9 +1188,9 @@ int qssb_enable_policy(struct qssb_policy *policy)
 
 	if(policy->syscall_policies == NULL && policy->disable_syscall_filter == 0)
 	{
-			if(qssb_append_default_syscall_policy(policy) != 0)
+			if(qssb_append_predefined_standard_syscall_policy(policy) != 0)
 			{
-				QSSB_LOG_ERROR("Failed to add default syscall policy\n");
+				QSSB_LOG_ERROR("Failed to add standard predefined syscall policy\n");
 				return -1;
 			}
 	}
