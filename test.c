@@ -42,6 +42,7 @@ int test_seccomp_blacklisted_call_permitted(int argc, char *argv[])
 	struct qssb_policy *policy = qssb_init_policy();
 
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
+	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
 
 	int ret = qssb_enable_policy(policy);
 	//geteuid is not blacklisted, so must succeed
