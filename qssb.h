@@ -1018,7 +1018,11 @@ static int enable_no_fs(struct qssb_policy *policy)
 			QSSB_LOG_ERROR("Failed to add system calls to policy\n");
 			return -1;
 		}
-
+		if(qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW) != 0)
+		{
+			QSSB_LOG_ERROR("Failed to add default policy when adding denied filesystem-related system calls\n");
+			return -1;
+		}
 		return 0;
 }
 
