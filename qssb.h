@@ -250,8 +250,8 @@ static int qssb_entry_append(struct qssb_allocated_entry *entry, void *data, siz
 	if(remaining < bytes)
 	{
 		size_t expandval = QSSB_ENTRY_ALLOC_SIZE > bytes ? QSSB_ENTRY_ALLOC_SIZE : bytes;
-		size_t sizenew = entry->size + expandval;
-		if(sizenew < entry->size)
+		size_t sizenew = 0;
+		if(__builtin_add_overflow(entry->size, expandval, &sizenew))
 		{
 			QSSB_LOG_ERROR("overflow in qssb_entry_append\n");
 			return -EINVAL;
@@ -273,7 +273,13 @@ static int qssb_entry_append(struct qssb_allocated_entry *entry, void *data, siz
 
 static int qssb_append_syscall(struct qssb_allocated_entry *entry, long *syscalls, size_t n)
 {
-	return qssb_entry_append(entry, syscalls, n * sizeof(long));
+	size_t bytes = 0;
+	if(__builtin_mul_overflow(n, sizeof(long), &bytes))
+	{
+		QSSB_LOG_ERROR("Overflow while trying to add system calls\n");
+		return -EINVAL;
+	}
+	return qssb_entry_append(entry, syscalls, bytes);
 }
 
 static int is_valid_syscall_policy(unsigned int policy)
@@ -749,6 +755,18 @@ static int qssb_enable_syscall_policy(struct qssb_policy *policy)
 		long *syscalls = NULL;
 		size_t n = 0;
 		get_syscall_array(current_policy, &syscalls, &n);
+
+		unsigned short int newsize;
+		if(__builtin_add_overflow(current_filter_index, n, &newsize))
+		{
+			QSSB_LOG_ERROR("Overflow when trying to add new system calls\n");
+			return -EINVAL;
+		}
+		if(newsize > (sizeof(filter)/sizeof(filter[0]))-1)
+		{
+			QSSB_LOG_ERROR("Too many system calls added\n");
+			return -EINVAL;
+		}
 		append_syscalls_to_bpf(syscalls, n, current_policy->policy, filter, &current_filter_index);
 		current_policy = current_policy->next;
 	}
