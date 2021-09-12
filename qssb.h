@@ -618,17 +618,43 @@ static int enter_namespaces(int namespace_options)
 		uid_t current_uid = getuid();
 		gid_t current_gid = getgid();
 
-		//TODO: check errors
 		FILE *fp = fopen("/proc/self/setgroups", "w");
-		fprintf(fp, "deny");
+		if(fp == NULL)
+		{
+			QSSB_LOG_ERROR("fopen failed while trying to deny setgroups\n");
+			return -1;
+		}
+		if(fprintf(fp, "deny") < 0)
+		{
+			QSSB_LOG_ERROR("fprintf failed while trying to write uid_map\n");
+			return -1;
+		}
 		fclose(fp);
 
 		fp = fopen("/proc/self/uid_map", "w");
-		fprintf(fp, "0 %i", current_uid);
+		if(fp == NULL)
+		{
+			QSSB_LOG_ERROR("fopen failed while trying to write uid_map\n");
+			return -1;
+		}
+		if(fprintf(fp, "0 %i", current_uid) < 0)
+		{
+			QSSB_LOG_ERROR("fprintf failed while trying to write uid_map\n");
+			return -1;
+		}
 		fclose(fp);
 
 		fp = fopen("/proc/self/gid_map", "w");
-		fprintf(fp, "0 %i", current_gid);
+		if(fp == NULL)
+		{
+			QSSB_LOG_ERROR("fopen failed while trying to write gid_map\n");
+			return -1;
+		}
+		if(fprintf(fp, "0 %i", current_gid) < 0)
+		{
+			QSSB_LOG_ERROR("fprintf failed while trying to write gid_map\n");
+			return -1;
+		}
 		fclose(fp);
 	}
 
