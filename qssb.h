@@ -567,7 +567,7 @@ static int mount_to_chroot(const char *chroot_target_path, struct qssb_path_poli
 			ret = mount(NULL, path_inside_chroot, NULL, mount_flags | MS_REMOUNT, NULL);
 			if(ret < 0 )
 			{
-				QSSB_LOG_ERROR("Error: Failed to remount %s: %s", path_inside_chroot, strerror(errno));
+				QSSB_LOG_ERROR("Error: Failed to remount %s: %s\n", path_inside_chroot, strerror(errno));
 				return ret;
 			}
 		}
@@ -670,7 +670,7 @@ static int drop_caps()
 
 	if(res == -1 && errno != EINVAL)
 	{
-		QSSB_LOG_ERROR("Failed to drop the capability bounding set!");
+		QSSB_LOG_ERROR("Failed to drop the capability bounding set!\n");
 		return -errno;
 	}
 
@@ -749,7 +749,7 @@ static int qssb_enable_syscall_policy(struct qssb_policy *policy)
 	{
 		if(!is_valid_syscall_policy(current_policy->policy))
 		{
-			QSSB_LOG_ERROR("invalid syscall policy specified");
+			QSSB_LOG_ERROR("invalid syscall policy specified\n");
 			return -1;
 		}
 		long *syscalls = NULL;
@@ -872,7 +872,7 @@ static int landlock_prepare_ruleset(struct qssb_path_policy *policies)
 	ruleset_fd = landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
 	if (ruleset_fd < 0)
 	{
-		QSSB_LOG_ERROR("Failed to create landlock ruleset");
+		QSSB_LOG_ERROR("Failed to create landlock ruleset\n");
 		return -1;
 	}
 	struct qssb_path_policy *policy = policies;
@@ -942,7 +942,7 @@ static int check_policy_sanity(struct qssb_policy *policy)
 		}
 		if(policy->no_fs == 1)
 		{
-			QSSB_LOG_ERROR("If path_policies are specified, no_fs cannot be set to 1");
+			QSSB_LOG_ERROR("If path_policies are specified, no_fs cannot be set to 1\n");
 			return -1;
 		}
 	}
