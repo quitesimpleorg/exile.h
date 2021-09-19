@@ -182,6 +182,24 @@ int test_seccomp_errno()
 	return test_successful_exit(&do_test_seccomp_errno);
 }
 
+static int test_seccomp_group()
+{
+	struct qssb_policy *policy = qssb_init_policy();
+
+	qssb_append_group_syscall_policy(policy, QSSB_SYSCALL_DENY_RET_ERROR, QSSB_SYSCGROUP_SOCKET);
+	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+
+	xqssb_enable_policy(policy);
+
+	int s = socket(AF_INET,SOCK_STREAM,0);
+	if(s != -1)
+	{
+		printf("Failed: socket was expected to return error\n");
+		return 1;
+	}
+	return 0;
+}
+
 int test_landlock()
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -280,6 +298,7 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-x32-kill", &test_seccomp_x32_kill},
 	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall},
 	{ "seccomp-errno", &test_seccomp_errno},
+	{ "seccomp-group", &test_seccomp_group},
 	{ "landlock", &test_landlock},
 	{ "landlock-deny-write", &test_landlock_deny_write },
 	{ "no_fs", &test_nofs},
