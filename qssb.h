@@ -980,7 +980,7 @@ static int check_policy_sanity(struct qssb_policy *policy)
 		int i = 0;
 		int last_match_all = -1;
 		int match_all_policy = 0;
-		int last_policy;
+		int last_policy = 0;
 		while(syscall_policy)
 		{
 			long *syscall;
