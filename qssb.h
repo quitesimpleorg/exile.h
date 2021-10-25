@@ -740,7 +740,7 @@ static void append_syscalls_to_bpf(long *syscalls, size_t n, unsigned int action
 		long syscall = syscalls[i];
 		if(syscall != QSSB_SYSCALL_MATCH_ALL)
 		{
-			struct sock_filter syscall_check = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, syscall, 0, 1);
+			struct sock_filter syscall_check = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, (unsigned int) syscall, 0, 1);
 			filter[(*start_index)++] = syscall_check;
 		}
 		struct sock_filter syscall_action = BPF_STMT(BPF_RET+BPF_K, action);
