@@ -796,6 +796,7 @@ int qssb_append_syscalls_policy(struct qssb_policy *qssb_policy, unsigned int sy
 	int ret = qssb_append_syscall(&newpolicy->syscall, syscalls, n);
 	if(ret != 0)
 	{
+		free(newpolicy);
 		QSSB_LOG_ERROR("Failed to append syscall\n");
 		return -1;
 	}
