@@ -840,6 +840,12 @@ int qssb_append_group_syscall_policy(struct qssb_policy *qssb_policy, unsigned i
 {
 	long syscalls[400] = { 0 };
 	size_t n = 0;
+
+	if(groupmask & QSSB_SYSCGROUP_NONE)
+	{
+		QSSB_LOG_ERROR("Error: 'None' is an illegal group name\n");
+		return -EINVAL;
+	}
 	get_group_syscalls(groupmask, syscalls, &n);
 	if(n == 0)
 	{
