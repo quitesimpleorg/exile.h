@@ -20,8 +20,7 @@ int xqssb_enable_policy(struct qssb_policy *policy)
 int test_default_main()
 {
 	struct qssb_policy *policy = qssb_init_policy();
-	int ret = qssb_enable_policy(policy);
-	return ret;
+	return xqssb_enable_policy(policy);
 }
 
 static int test_expected_kill(int (*f)())
@@ -112,7 +111,7 @@ static int do_test_seccomp_blacklisted_call_permitted()
 	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
 	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
 
-	int ret = qssb_enable_policy(policy);
+	xqssb_enable_policy(policy);
 	//geteuid is not blacklisted, so must succeed
 	uid_t pid = geteuid();
 	return 0;
@@ -204,7 +203,8 @@ int test_landlock()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	qssb_append_path_policy(policy, QSSB_FS_ALLOW_READ, "/proc/self/fd");
-	int ret = qssb_enable_policy(policy);
+	xqssb_enable_policy(policy);
+
 	int fd = open("/", O_RDONLY | O_CLOEXEC);
 	if(fd < 0)
 	{
@@ -217,7 +217,8 @@ int test_landlock_deny_write()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	qssb_append_path_policy(policy, QSSB_FS_ALLOW_READ, "/tmp/");
-	int ret = qssb_enable_policy(policy);
+	xqssb_enable_policy(policy);
+
 	int fd = open("/tmp/a", O_WRONLY | O_CLOEXEC);
 	if(fd < 0)
 	{
@@ -230,13 +231,7 @@ int test_nofs()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	policy->no_fs = 1;
-
-	int ret = qssb_enable_policy(policy);
-	if(ret != 0)
-	{
-		fprintf(stderr, "Failed to activate nofs sandbox\n");
-		return -1;
-	}
+	xqssb_enable_policy(policy);
 
 	int s = socket(AF_INET,SOCK_STREAM,0);
 	if(s == -1)
@@ -260,13 +255,7 @@ int test_no_new_fds()
 {
 	struct qssb_policy *policy = qssb_init_policy();
 	policy->no_new_fds = 1;
-
-	int ret = qssb_enable_policy(policy);
-	if(ret != 0)
-	{
-		fprintf(stderr, "Failed to activate no_new_fd sandbox\n");
-		return -1;
-	}
+	xqssb_enable_policy(policy);
 
 	if(open("/tmp/test", O_CREAT | O_WRONLY) >= 0)
 	{
