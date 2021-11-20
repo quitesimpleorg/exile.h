@@ -1583,21 +1583,6 @@ static int enable_no_fs(struct qssb_policy *policy)
 		return 0;
 }
 
-static int qssb_append_predefined_standard_syscall_policy(struct qssb_policy *policy)
-{
-	int appendresult = qssb_append_group_syscall_policy(policy, QSSB_SYSCALL_ALLOW, QSSB_SYSCGROUP_DEFAULT_ALLOW);
-	if(appendresult != 0)
-	{
-		return 1;
-	}
-	appendresult = qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_DENY_RET_ERROR);
-	if(appendresult != 0)
-	{
-		return 1;
-	}
-	return 0;
-}
-
 /* Enables the specified qssb_policy.
  *
  * This function is not atomic (and can't be). This means some
@@ -1744,15 +1729,6 @@ int qssb_enable_policy(struct qssb_policy *policy)
 	}
 	close(landlock_ruleset_fd);
 #endif
-
-	if(policy->syscall_policies == NULL && policy->disable_syscall_filter == 0)
-	{
-			if(qssb_append_predefined_standard_syscall_policy(policy) != 0)
-			{
-				QSSB_LOG_ERROR("Failed to add standard predefined syscall policy\n");
-				return -1;
-			}
-	}
 
 	if(policy->syscall_policies != NULL)
 	{
