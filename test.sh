@@ -1,10 +1,12 @@
 #!/bin/sh
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 COUNT_SUCCEEDED=0
 COUNT_FAILED=0
+COUNT_SKIPPED=0
 
 function print_fail()
 {
@@ -14,6 +16,11 @@ function print_fail()
 function print_success()
 {
 	echo -e "${GREEN}$@${NC}"
+}
+
+function print_skipped()
+{
+	echo -e "${YELLOW}$@${NC}"
 }
 
 function runtest_fail()
@@ -26,6 +33,12 @@ function runtest_success()
 {
 	print_success "ok"
 	COUNT_SUCCEEDED=$((COUNT_SUCCEEDED+1))
+}
+
+function runtest_skipped()
+{
+	print_skipped "skipped"
+	COUNT_SKIPPED=$((COUNT_SKIPPED+1))
 }
 
 
@@ -44,6 +57,9 @@ function runtest()
 	if [ $ret -eq 0 ] ; then
 		runtest_success
 		SUCCESS="yes"
+	elif [ $ret -eq 2 ] ; then
+		runtest_skipped
+		SUCCESS="skipped"
 	else
 		runtest_fail
 	fi
@@ -69,7 +85,7 @@ echo
 echo "Tests finished. Logs in $(realpath ${LOG_OUTPUT_DIR_PATH})"
 echo "Succeeded: $COUNT_SUCCEEDED"
 echo "Failed: $COUNT_FAILED"
-
+echo "Skipped: $COUNT_SKIPPED"
 
 if [ $COUNT_FAILED -gt 0 ] ; then
 	exit 1

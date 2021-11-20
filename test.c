@@ -199,6 +199,7 @@ static int test_seccomp_group()
 	return 0;
 }
 
+#if HAVE_LANDLOCK == 1
 int test_landlock()
 {
 	struct qssb_policy *policy = qssb_init_policy();
@@ -226,6 +227,17 @@ int test_landlock_deny_write()
 	}
 	return 1;
 }
+#else
+int test_landlock()
+{
+	return 2;
+}
+
+int test_landlock_deny_write()
+{
+	return 2;
+}
+#endif
 
 int test_nofs()
 {
