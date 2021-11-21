@@ -87,13 +87,13 @@ static int test_successful_exit(int (*f)())
 static int do_test_seccomp_blacklisted()
 {
 	struct exile_policy *policy = exile_init_policy();
-	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_policy(policy,EXILE_SYS(getuid), EXILE_SYSCALL_DENY_KILL_PROCESS, NULL, 0);
 	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
 	xexile_enable_policy(policy);
 
-	uid_t pid = geteuid();
-	pid = getuid();
+	uid_t pid = syscall(EXILE_SYS(geteuid));
+	pid = syscall(EXILE_SYS(getuid));
 	return 0;
 
 
@@ -108,12 +108,12 @@ static int do_test_seccomp_blacklisted_call_permitted()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_policy(policy, EXILE_SYS(getuid),  EXILE_SYSCALL_DENY_KILL_PROCESS, NULL, 0);
 	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
 	xexile_enable_policy(policy);
 	//geteuid is not blacklisted, so must succeed
-	uid_t pid = geteuid();
+	uid_t pid = syscall(EXILE_SYS(geteuid));
 	return 0;
 }
 
@@ -127,7 +127,7 @@ static int do_test_seccomp_x32_kill()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_policy(policy, EXILE_SYS(getuid), EXILE_SYSCALL_DENY_KILL_PROCESS, NULL, 0);
 	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
 	xexile_enable_policy(policy);
@@ -148,7 +148,7 @@ int test_seccomp_require_last_matchall()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_policy(policy, EXILE_SYS(getuid), EXILE_SYSCALL_DENY_KILL_PROCESS, NULL, 0);
 
 	int status = exile_enable_policy(policy);
 	if(status == 0)
@@ -163,13 +163,13 @@ static int do_test_seccomp_errno()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_RET_ERROR, EXILE_SYS(close));
+	exile_append_syscall_policy(policy, EXILE_SYS(close),EXILE_SYSCALL_DENY_RET_ERROR,  NULL, 0);
 	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
 	xexile_enable_policy(policy);
-	uid_t id = getuid();
+	uid_t id = syscall(EXILE_SYS(getuid));
 
-	int fd = close(0);
+	int fd = syscall(EXILE_SYS(close), 0);
 	printf("close() return code: %i, errno: %s\n", fd, strerror(errno));
 	return fd == -1 ? 0 : 1;
 }
@@ -185,7 +185,11 @@ static int test_seccomp_group()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	exile_append_group_syscall_policy(policy, EXILE_SYSCALL_DENY_RET_ERROR, EXILE_SYSCGROUP_SOCKET);
+	if(exile_append_group_syscall_policy(policy, EXILE_SYSCALL_DENY_RET_ERROR, EXILE_SYSCGROUP_SOCKET) != 0)
+	{
+		printf("nothing added\n");
+		return 1;
+	}
 	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
 	xexile_enable_policy(policy);
@@ -193,7 +197,107 @@ static int test_seccomp_group()
 	int s = socket(AF_INET,SOCK_STREAM,0);
 	if(s != -1)
 	{
-		printf("Failed: socket was expected to return error\n");
+		printf("Failed: socket was expected to return error, but returned %i\n", s);
+		return 1;
+	}
+	return 0;
+}
+
+int test_seccomp_argfilter_allowed()
+{
+	struct exile_policy *policy = exile_init_policy();
+
+	struct sock_filter argfilter[2] = 
+	{
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+	};
+	
+	exile_append_syscall_policy(policy, EXILE_SYS(open),EXILE_SYSCALL_DENY_RET_ERROR,  argfilter, 2);
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
+	xexile_enable_policy(policy);
+
+
+	char *t = "/dev/random";
+	int ret = (int) syscall(EXILE_SYS(open),t, O_RDONLY);
+
+	if(ret == -1)
+	{
+		printf("Failed: open was expected to succeed, but returned %i\n", ret);
+		return 1;
+	}
+	return 0;
+}
+
+int test_seccomp_argfilter_filtered()
+{
+	struct exile_policy *policy = exile_init_policy();
+
+	struct sock_filter argfilter[2] = 
+	{
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+	};
+
+	exile_append_syscall_policy(policy, EXILE_SYS(open),EXILE_SYSCALL_DENY_RET_ERROR, argfilter, 2);
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
+	xexile_enable_policy(policy);
+
+	char *t = "/dev/random";
+	int ret = (int) syscall(EXILE_SYS(open),t, O_WRONLY);
+
+	if(ret != -1)
+	{
+		printf("Failed: open was expected to fail, but returned %i\n", ret);
+		return 1;
+	}
+	return 0;
+}
+
+
+int test_seccomp_argfilter_mixed()
+{
+	struct exile_policy *policy = exile_init_policy();
+
+	struct sock_filter argfilter[2] = 
+	{
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+	};
+
+	exile_append_syscall_policy(policy, EXILE_SYS(stat),EXILE_SYSCALL_DENY_RET_ERROR, NULL,0);
+	exile_append_syscall_policy(policy, EXILE_SYS(open),EXILE_SYSCALL_DENY_RET_ERROR, argfilter, 2);
+	exile_append_syscall_policy(policy, EXILE_SYS(getpid),EXILE_SYSCALL_DENY_RET_ERROR, NULL, 0);
+
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
+	xexile_enable_policy(policy);
+
+	struct stat statbuf;
+	int s = (int) syscall(EXILE_SYS(stat), "/dev/urandom", &statbuf);
+	if(s != -1)
+	{
+		printf("Failed: stat was expected to fail, but returned %i\n", s);
+		return 1;
+	}
+
+	pid_t p = (pid_t) syscall(EXILE_SYS(getpid));
+	if(p != -1)
+	{
+		printf("Failed: getpid was expected to fail, but returned %i\n", p);
+		return 1;
+	}
+
+	char *t = "/dev/random";
+	int ret = (int) syscall(EXILE_SYS(open),t, O_WRONLY);
+	if(ret != -1)
+	{
+		printf("Failed: open was expected to fail, but returned %i\n", ret);
+		return 1;
+	}
+	ret = (int) syscall(EXILE_SYS(open), t, O_RDONLY);
+	if(ret == -1)
+	{
+		printf("Failed: open with O_RDONLY was expected to succeed, but returned %i\n", ret);
 		return 1;
 	}
 	return 0;
@@ -300,6 +404,9 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall},
 	{ "seccomp-errno", &test_seccomp_errno},
 	{ "seccomp-group", &test_seccomp_group},
+	{ "seccomp-argfilter-allowed", &test_seccomp_argfilter_allowed},
+	{ "seccomp-argfilter-filtered", &test_seccomp_argfilter_filtered},
+	{ "seccomp-argfilter-mixed", &test_seccomp_argfilter_mixed},
 	{ "landlock", &test_landlock},
 	{ "landlock-deny-write", &test_landlock_deny_write },
 	{ "no_fs", &test_nofs},

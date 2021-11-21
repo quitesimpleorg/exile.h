@@ -673,32 +673,23 @@ struct exile_path_policy
 	struct exile_path_policy *next;
 };
 
-
-struct exile_allocated_entry
-{
-	void *data; /* the actual data */
-	size_t size; /* number of bytes allocated for data */
-	size_t used; /* number of bytes in use */
-};
-
-/* Special value */
+/* Special values */
 #define EXILE_SYSCALL_MATCH_ALL -1
+#define EXILE_SYSCALL_EXIT_BPF_NO_MATCH 255 //exit the bpf filter, not matching policy
 
 #define EXILE_SYSCALL_ALLOW 1
 #define EXILE_SYSCALL_DENY_KILL_PROCESS 2
 #define EXILE_SYSCALL_DENY_RET_ERROR 3
 
-
+#define EXILE_ARGFILTERS_COUNT 60
 struct exile_syscall_policy
 {
-	struct exile_allocated_entry syscall;
+	struct sock_filter argfilters[EXILE_ARGFILTERS_COUNT];
+	size_t argfilterscount;
+	long syscall;
 	unsigned int policy;
 	struct exile_syscall_policy *next;
 };
-
-/* Number of bytes to grow the buffer in exile_allocated_entry  with */
-#define EXILE_ENTRY_ALLOC_SIZE 32
-
 
 /* Policy tells exile what to do */
 struct exile_policy
@@ -727,86 +718,32 @@ struct exile_policy
 
 };
 
-static int exile_entry_append(struct exile_allocated_entry *entry, void *data, size_t bytes)
-{
-	size_t remaining = entry->size - entry->used;
-	if(remaining < bytes)
-	{
-		size_t expandval = EXILE_ENTRY_ALLOC_SIZE > bytes ? EXILE_ENTRY_ALLOC_SIZE : bytes;
-		size_t sizenew = 0;
-		if(__builtin_add_overflow(entry->size, expandval, &sizenew))
-		{
-			EXILE_LOG_ERROR("overflow in exile_entry_append\n");
-			return -EINVAL;
-		}
-		int *datanew = (int *) realloc(entry->data, sizenew);
-		if(datanew == NULL)
-		{
-			EXILE_LOG_ERROR("failed to resize array: %s\n", strerror(errno));
-			return -1;
-		}
-		entry->size = sizenew;
-		entry->data = datanew;
-	}
-	uint8_t *target = (uint8_t *) entry->data;
-	memcpy(target + entry->used, data, bytes);
-	entry->used = entry->used + bytes;
-	return 0;
-}
-
-static int exile_append_syscall(struct exile_allocated_entry *entry, long *syscalls, size_t n)
-{
-	size_t bytes = 0;
-	if(__builtin_mul_overflow(n, sizeof(long), &bytes))
-	{
-		EXILE_LOG_ERROR("Overflow while trying to add system calls\n");
-		return -EINVAL;
-	}
-	return exile_entry_append(entry, syscalls, bytes);
-}
-
 static int is_valid_syscall_policy(unsigned int policy)
 {
 	return policy == EXILE_SYSCALL_ALLOW || policy == EXILE_SYSCALL_DENY_RET_ERROR || policy == EXILE_SYSCALL_DENY_KILL_PROCESS;
 }
 
-static void get_syscall_array(struct exile_syscall_policy *policy, long **syscall, size_t *n)
+int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall, unsigned int syscall_policy, struct sock_filter *argfilters, size_t n)
 {
-	*syscall = (long *) policy->syscall.data;
-	*n = policy->syscall.used / sizeof(long);
-}
-
-int exile_append_syscalls_policy(struct exile_policy *exile_policy, unsigned int syscall_policy, long *syscalls, size_t n)
-{
-	/* Check whether we already have this policy. If so, merge new entries to the existing ones */
-	struct exile_syscall_policy *current_policy = exile_policy->syscall_policies;
-	while(current_policy)
-	{
-		if(current_policy->policy == syscall_policy)
-		{
-			return exile_append_syscall(&current_policy->syscall, syscalls, n);
-		}
-		current_policy = current_policy->next;
-	}
-
-	/* We don't so we create a new policy */
 	struct exile_syscall_policy *newpolicy = (struct exile_syscall_policy *) calloc(1, sizeof(struct exile_syscall_policy));
 	if(newpolicy == NULL)
 	{
 		EXILE_LOG_ERROR("Failed to allocate memory for syscall policy\n");
 		return -1;
 	}
-
-	int ret = exile_append_syscall(&newpolicy->syscall, syscalls, n);
-	if(ret != 0)
+	newpolicy->policy = syscall_policy;
+	newpolicy->syscall = syscall;
+	newpolicy->argfilterscount = n;
+	if(n > EXILE_ARGFILTERS_COUNT)
 	{
-		free(newpolicy);
-		EXILE_LOG_ERROR("Failed to append syscall\n");
+		EXILE_LOG_ERROR("Too many argfilters supplied\n");
 		return -1;
 	}
-
+	for(size_t i = 0; i < n; i++)
+	{
+		newpolicy->argfilters[i] = argfilters[i];
+	}
 	newpolicy->next = NULL;
-	newpolicy->policy = syscall_policy;
 
 	*(exile_policy->syscall_policies_tail) = newpolicy;
 	exile_policy->syscall_policies_tail = &(newpolicy->next);
@@ -815,14 +752,10 @@ int exile_append_syscalls_policy(struct exile_policy *exile_policy, unsigned int
 	return 0;
 }
 
-int exile_append_syscall_policy(struct exile_policy *exile_policy, unsigned int syscall_policy, long syscall)
-{
-	return exile_append_syscalls_policy(exile_policy, syscall_policy, &syscall, 1);
-}
 
 int exile_append_syscall_default_policy(struct exile_policy *exile_policy, unsigned int default_policy)
 {
-	return exile_append_syscall_policy(exile_policy, default_policy, EXILE_SYSCALL_MATCH_ALL);
+	return exile_append_syscall_policy(exile_policy, EXILE_SYSCALL_MATCH_ALL, default_policy, NULL, 0);
 }
 
 static void get_group_syscalls(uint64_t mask, long *syscalls, size_t *n)
@@ -856,8 +789,17 @@ int exile_append_group_syscall_policy(struct exile_policy *exile_policy, unsigne
 		EXILE_LOG_ERROR("Error: No syscalls found for group mask\n");
 		return -EINVAL;
 	}
+	for(size_t i = 0; i < n; i++)
+	{
+		int ret = exile_append_syscall_policy(exile_policy, syscalls[i], syscall_policy, NULL, 0);
+		if(ret != 0)
+		{
+			EXILE_LOG_ERROR("Error: Failed while trying to append group policy\n");
+			return ret;
+		}
+	}
 
-	return exile_append_syscalls_policy(exile_policy, syscall_policy, syscalls, n);
+	return 0;
 }
 
 /* Creates the default policy
@@ -1240,8 +1182,9 @@ static int drop_caps()
 
 
 
-static void append_syscalls_to_bpf(long *syscalls, size_t n, unsigned int action, struct sock_filter *filter, unsigned short int *start_index)
+static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, struct sock_filter *filter, unsigned short int *start_index)
 {
+	unsigned int action = syscallpolicy->policy;
 	if(action == EXILE_SYSCALL_ALLOW)
 	{
 		action = SECCOMP_RET_ALLOW;
@@ -1254,18 +1197,45 @@ static void append_syscalls_to_bpf(long *syscalls, size_t n, unsigned int action
 	{
 		action = SECCOMP_RET_ERRNO|EACCES;
 	}
-	for(size_t i = 0; i < n; i++)
+	long syscall = syscallpolicy->syscall;
+
+	struct sock_filter syscall_load = BPF_STMT(BPF_LD+BPF_W+BPF_ABS, offsetof(struct seccomp_data, nr));
+	filter[(*start_index)++] = 	syscall_load;
+	if(syscall != EXILE_SYSCALL_MATCH_ALL)
 	{
-		long syscall = syscalls[i];
-		if(syscall != EXILE_SYSCALL_MATCH_ALL)
-		{
-			struct sock_filter syscall_check = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, (unsigned int) syscall, 0, 1);
+			/* How many steps forward to jump when we don't match. This is either the last statement,
+			 * i. e. the default action or the next syscall policy */
+			__u8 next_syscall_pc =  1;
+			if(__builtin_add_overflow(next_syscall_pc,  syscallpolicy->argfilterscount, &next_syscall_pc))
+			{
+					EXILE_LOG_ERROR("Error: Overflow while trying to calculate jump offset\n");
+					/* TODO: Return error */
+					return;
+			}
+			struct sock_filter syscall_check = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, (unsigned int) syscall, 0, next_syscall_pc);
 			filter[(*start_index)++] = syscall_check;
-		}
-		struct sock_filter syscall_action = BPF_STMT(BPF_RET+BPF_K, action);
-		/* TODO: we can do better than adding this below every jump */
-		filter[(*start_index)++] = syscall_action;
+			--next_syscall_pc;
+
+			for(size_t i = 0; i < syscallpolicy->argfilterscount; i++)
+			{
+				filter[*start_index] = syscallpolicy->argfilters[i];
+				__u8 jump_count = next_syscall_pc;
+				if(filter[*start_index].jt == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+				{
+					filter[*start_index].jt = jump_count;
+				}
+				if(filter[*start_index].jf == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+				{
+					filter[*start_index].jf = jump_count;
+				}
+				--next_syscall_pc;
+				++*start_index;
+			}
 	}
+	struct sock_filter syscall_action = BPF_STMT(BPF_RET+BPF_K, action);
+	/* TODO: we can do better than adding this below every jump */
+	filter[(*start_index)++] = syscall_action;
+	
 }
 /*
  * Enables the seccomp policy
@@ -1297,21 +1267,8 @@ static int exile_enable_syscall_policy(struct exile_policy *policy)
 			EXILE_LOG_ERROR("invalid syscall policy specified\n");
 			return -1;
 		}
-		long *syscalls = NULL;
-		size_t n = 0;
-		get_syscall_array(current_policy, &syscalls, &n);
-		unsigned short int newsize;
-		if(__builtin_add_overflow(current_filter_index, n, &newsize))
-		{
-			EXILE_LOG_ERROR("Overflow when trying to add new system calls\n");
-			return -EINVAL;
-		}
-		if(newsize > (sizeof(filter)/sizeof(filter[0]))-1)
-		{
-			EXILE_LOG_ERROR("Too many system calls added\n");
-			return -EINVAL;
-		}
-		append_syscalls_to_bpf(syscalls, n, current_policy->policy, filter, &current_filter_index);
+		/* TODO: reintroduce overflow checks */
+		append_syscall_to_bpf(current_policy, filter, &current_filter_index);
 		current_policy = current_policy->next;
 	}
 
@@ -1504,10 +1461,7 @@ static int check_policy_sanity(struct exile_policy *policy)
 		int last_policy = 0;
 		while(syscall_policy)
 		{
-			long *syscall;
-			size_t n = 0;
-			get_syscall_array(syscall_policy, &syscall, &n);
-			if(syscall[n-1] == EXILE_SYSCALL_MATCH_ALL)
+			if(syscall_policy->syscall == EXILE_SYSCALL_MATCH_ALL)
 			{
 				last_match_all = i;
 				match_all_policy = syscall_policy->policy;
