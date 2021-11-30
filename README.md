@@ -1,5 +1,5 @@
-# qssb.h (quite simple sandbox)
-`qssb.h` is a simple header-only library that provides an interface to sandbox processes on Linux. Using Seccomp and Linux Namespaces for that purpose requires some knowledge of annoying details which this library aims to abstract away as much as possible, when reasonable. Hence, the goal is to provide a convenient way for processes to restrict themselves in order to mitigate the effect of exploits. Currently, it utilizes technologies like Seccomp, Namespaces and Landlock to this end. 
+# exile.h
+`exile.h` is a simple header-only library that provides an interface to isolate processes on Linux. Using Seccomp and Linux Namespaces for that purpose requires some knowledge of annoying details which this library aims to abstract away as much as possible, when reasonable. Hence, the goal is to provide a convenient way for processes to restrict themselves in order to mitigate the effect of exploits. Currently, it utilizes technologies like Seccomp, Namespaces and Landlock to this end.
 
 ## Status
 No release yet, expiremental, API is unstable, builds will break on updates of this library. 
@@ -48,8 +48,8 @@ the library may check against that. Execute
 
 Contributions are very welcome. Options: 
 
-1. Pull-Request on [github](https://github.com/quitesimpleorg/qssb.h)
-2. Mail to `qssb at quitesimple.org` with instructions on where to pull the changes from.
+1. Pull-Request on [github](https://github.com/quitesimpleorg/exile.h)
+2. Mail to `exile at quitesimple.org` with instructions on where to pull the changes from.
 3. Mailing a classic patch/diff to the same address.
 
 

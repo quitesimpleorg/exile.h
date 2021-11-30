@@ -74,7 +74,7 @@ if [ -z "$LOG_OUTPUT_DIR" ] ; then
 LOG_OUTPUT_DIR="./logs/"
 fi
 
-LOG_OUTPUT_DIR_PATH="${LOG_OUTPUT_DIR}/qssb_test_${GIT_ID}_${TIMESTAMP}"
+LOG_OUTPUT_DIR_PATH="${LOG_OUTPUT_DIR}/exile_test_${GIT_ID}_${TIMESTAMP}"
 [ -d "$LOG_OUTPUT_DIR_PATH" ] || mkdir -p "$LOG_OUTPUT_DIR_PATH"
 
 for test in $( ./test --dumptests ) ; do

@@ -1,4 +1,4 @@
-#include "qssb.h"
+#include "exile.h"
 #include <stdbool.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -6,12 +6,12 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
-int xqssb_enable_policy(struct qssb_policy *policy)
+int xexile_enable_policy(struct exile_policy *policy)
 {
-	int ret = qssb_enable_policy(policy);
+	int ret = exile_enable_policy(policy);
 	if(ret != 0)
 	{
-		fprintf(stderr, "qssb_enable_policy() failed: %i\n", ret);
+		fprintf(stderr, "exile_enable_policy() failed: %i\n", ret);
 		exit(EXIT_FAILURE);
 	}
 	return 0;
@@ -19,8 +19,8 @@ int xqssb_enable_policy(struct qssb_policy *policy)
 
 int test_default_main()
 {
-	struct qssb_policy *policy = qssb_init_policy();
-	return xqssb_enable_policy(policy);
+	struct exile_policy *policy = exile_init_policy();
+	return xexile_enable_policy(policy);
 }
 
 static int test_expected_kill(int (*f)())
@@ -86,11 +86,11 @@ static int test_successful_exit(int (*f)())
 
 static int do_test_seccomp_blacklisted()
 {
-	struct qssb_policy *policy = qssb_init_policy();
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
-	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+	struct exile_policy *policy = exile_init_policy();
+	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 
 	uid_t pid = geteuid();
 	pid = getuid();
@@ -106,12 +106,12 @@ int test_seccomp_blacklisted()
 
 static int do_test_seccomp_blacklisted_call_permitted()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
-	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 	//geteuid is not blacklisted, so must succeed
 	uid_t pid = geteuid();
 	return 0;
@@ -125,15 +125,15 @@ int test_seccomp_blacklisted_call_permitted()
 
 static int do_test_seccomp_x32_kill()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
-	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 
 	/* Attempt to bypass by falling back to x32 should be blocked */
-	syscall(QSSB_SYS(getuid)+__X32_SYSCALL_BIT);
+	syscall(EXILE_SYS(getuid)+__X32_SYSCALL_BIT);
 
 	return 0;
 }
@@ -146,11 +146,11 @@ int test_seccomp_x32_kill()
 /* Tests whether seccomp rules end with a policy matching all syscalls */
 int test_seccomp_require_last_matchall()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_KILL_PROCESS, QSSB_SYS(getuid));
+	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_KILL_PROCESS, EXILE_SYS(getuid));
 
-	int status = qssb_enable_policy(policy);
+	int status = exile_enable_policy(policy);
 	if(status == 0)
 	{
 		printf("Failed. Should not have been enabled!");
@@ -161,12 +161,12 @@ int test_seccomp_require_last_matchall()
 
 static int do_test_seccomp_errno()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 
-	qssb_append_syscall_policy(policy, QSSB_SYSCALL_DENY_RET_ERROR, QSSB_SYS(close));
-	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+	exile_append_syscall_policy(policy, EXILE_SYSCALL_DENY_RET_ERROR, EXILE_SYS(close));
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 	uid_t id = getuid();
 
 	int fd = close(0);
@@ -183,12 +183,12 @@ int test_seccomp_errno()
 
 static int test_seccomp_group()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 
-	qssb_append_group_syscall_policy(policy, QSSB_SYSCALL_DENY_RET_ERROR, QSSB_SYSCGROUP_SOCKET);
-	qssb_append_syscall_default_policy(policy, QSSB_SYSCALL_ALLOW);
+	exile_append_group_syscall_policy(policy, EXILE_SYSCALL_DENY_RET_ERROR, EXILE_SYSCGROUP_SOCKET);
+	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 
 	int s = socket(AF_INET,SOCK_STREAM,0);
 	if(s != -1)
@@ -202,9 +202,9 @@ static int test_seccomp_group()
 #if HAVE_LANDLOCK == 1
 int test_landlock()
 {
-	struct qssb_policy *policy = qssb_init_policy();
-	qssb_append_path_policy(policy, QSSB_FS_ALLOW_READ, "/proc/self/fd");
-	xqssb_enable_policy(policy);
+	struct exile_policy *policy = exile_init_policy();
+	exile_append_path_policy(policy, EXILE_FS_ALLOW_READ, "/proc/self/fd");
+	xexile_enable_policy(policy);
 
 	int fd = open("/", O_RDONLY | O_CLOEXEC);
 	if(fd < 0)
@@ -216,9 +216,9 @@ int test_landlock()
 
 int test_landlock_deny_write()
 {
-	struct qssb_policy *policy = qssb_init_policy();
-	qssb_append_path_policy(policy, QSSB_FS_ALLOW_READ, "/tmp/");
-	xqssb_enable_policy(policy);
+	struct exile_policy *policy = exile_init_policy();
+	exile_append_path_policy(policy, EXILE_FS_ALLOW_READ, "/tmp/");
+	xexile_enable_policy(policy);
 
 	int fd = open("/tmp/a", O_WRONLY | O_CLOEXEC);
 	if(fd < 0)
@@ -241,9 +241,9 @@ int test_landlock_deny_write()
 
 int test_nofs()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 	policy->no_fs = 1;
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 
 	int s = socket(AF_INET,SOCK_STREAM,0);
 	if(s == -1)
@@ -265,9 +265,9 @@ int test_nofs()
 
 int test_no_new_fds()
 {
-	struct qssb_policy *policy = qssb_init_policy();
+	struct exile_policy *policy = exile_init_policy();
 	policy->no_new_fds = 1;
-	xqssb_enable_policy(policy);
+	xexile_enable_policy(policy);
 
 	if(open("/tmp/test", O_CREAT | O_WRONLY) >= 0)
 	{

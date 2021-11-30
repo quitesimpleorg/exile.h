@@ -47,7 +47,7 @@ for line in lines:
 	if genifndef:
 		ifndef[currentsyscall] = genifndef.groups(1)[0]
 	
-	array_line = "{QSSB_SYS(%s), %s}," % (currentsyscall, '|'.join(currentgroups))
+	array_line = "{EXILE_SYS(%s), %s}," % (currentsyscall, '|'.join(currentgroups))
 	print(array_line)
 
 print_ifndefs()
