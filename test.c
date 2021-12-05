@@ -181,38 +181,16 @@ int test_seccomp_errno()
 	return test_successful_exit(&do_test_seccomp_errno);
 }
 
-static int test_seccomp_group()
-{
-	struct exile_policy *policy = exile_init_policy();
-
-	if(exile_append_group_syscall_policy(policy, EXILE_SYSCALL_DENY_RET_ERROR, EXILE_SYSCGROUP_SOCKET) != 0)
-	{
-		printf("nothing added\n");
-		return 1;
-	}
-	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
-
-	xexile_enable_policy(policy);
-
-	int s = socket(AF_INET,SOCK_STREAM,0);
-	if(s != -1)
-	{
-		printf("Failed: socket was expected to return error, but returned %i\n", s);
-		return 1;
-	}
-	return 0;
-}
-
 int test_seccomp_argfilter_allowed()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	struct sock_filter argfilter[2] = 
+	struct sock_filter argfilter[2] =
 	{
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
 		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
 	};
-	
+
 	exile_append_syscall_policy(policy, EXILE_SYS(open),EXILE_SYSCALL_DENY_RET_ERROR,  argfilter, 2);
 	exile_append_syscall_default_policy(policy, EXILE_SYSCALL_ALLOW);
 	xexile_enable_policy(policy);
@@ -233,7 +211,7 @@ int test_seccomp_argfilter_filtered()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	struct sock_filter argfilter[2] = 
+	struct sock_filter argfilter[2] =
 	{
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
 		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
@@ -259,7 +237,7 @@ int test_seccomp_argfilter_mixed()
 {
 	struct exile_policy *policy = exile_init_policy();
 
-	struct sock_filter argfilter[2] = 
+	struct sock_filter argfilter[2] =
 	{
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
 		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
@@ -298,6 +276,72 @@ int test_seccomp_argfilter_mixed()
 	if(ret == -1)
 	{
 		printf("Failed: open with O_RDONLY was expected to succeed, but returned %i\n", ret);
+		return 1;
+	}
+	return 0;
+}
+
+
+int do_test_seccomp_pledge_socket()
+{
+	struct exile_policy *policy = exile_init_policy();
+	policy->pledge_promises = EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_INET | EXILE_SYSCALL_PLEDGE_DENY_ERROR;
+	xexile_enable_policy(policy);
+
+	int s = socket(AF_INET, SOCK_STREAM, 0);
+	if(s == -1)
+	{
+		printf("Failed: socket was expected to succeed, but returned %i\n", s);
+		return 1;
+	}
+	s = socket(AF_UNIX, SOCK_DGRAM, 0);
+	if(s != -1)
+	{
+		printf("Failed: socket was expected to fail, but returned %i\n", s);
+		return 1;
+	}
+	return 0;
+}
+
+int do_test_seccomp_pledge_open()
+{
+	struct exile_policy *policy = exile_init_policy();
+	policy->pledge_promises = EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_RPATH | EXILE_SYSCALL_PLEDGE_DENY_ERROR;
+	xexile_enable_policy(policy);
+
+	int ret = open("/dev/urandom", O_WRONLY  | O_APPEND);
+	if(ret != -1)
+	{
+		printf("Failed: open was expected to fail, but returned %i\n", ret);
+		return 1;
+	}
+	ret = open("/dev/urandom", O_RDWR);
+	if(ret != -1)
+	{
+		printf("Failed: open O_RDWR was expected to fail, but returned %i\n", ret);
+		return 1;
+	}
+	ret = open("/dev/urandom", O_RDONLY);
+	if(ret == -1)
+	{
+		printf("Failed: open was expected to succceed, but returned %i\n", ret);
+		return 1;
+	}
+	return 0;
+}
+
+int test_seccomp_pledge()
+{
+	int ret = test_successful_exit(&do_test_seccomp_pledge_open);
+	if(ret != 0)
+	{
+		printf("Failed: do_test_seccomp_pledge_open()\n");
+		return 1;
+	}
+	ret = test_successful_exit(&do_test_seccomp_pledge_socket);
+	if(ret != 0)
+	{
+		printf("Failed: do_test_seccomp_pledge_socket()\n");
 		return 1;
 	}
 	return 0;
@@ -403,10 +447,10 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-x32-kill", &test_seccomp_x32_kill},
 	{ "seccomp-require-last-matchall", &test_seccomp_require_last_matchall},
 	{ "seccomp-errno", &test_seccomp_errno},
-	{ "seccomp-group", &test_seccomp_group},
 	{ "seccomp-argfilter-allowed", &test_seccomp_argfilter_allowed},
 	{ "seccomp-argfilter-filtered", &test_seccomp_argfilter_filtered},
 	{ "seccomp-argfilter-mixed", &test_seccomp_argfilter_mixed},
+	{ "seccomp-pledge", &test_seccomp_pledge},
 	{ "landlock", &test_landlock},
 	{ "landlock-deny-write", &test_landlock_deny_write },
 	{ "no_fs", &test_nofs},
