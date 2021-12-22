@@ -666,6 +666,12 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 		EXILE_BPF_NOP
 	};
 
+	struct sock_filter setsockopt_filter[] = {
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[2]))),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SO_DEBUG, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SO_SNDBUFFORCE, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
+	};
+
 	int result = 0;
 	int current_filter_index = 1;
 	switch(syscall)
@@ -738,6 +744,11 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			socket_filter[current_filter_index-1].jf = EXILE_SYSCALL_EXIT_BPF_NO_MATCH;
 			result = current_filter_index;
 			memcpy(filter, socket_filter, result * sizeof(struct sock_filter));
+			break;
+		case EXILE_SYS(setsockopt):
+			result = sizeof(setsockopt_filter)/sizeof(setsockopt_filter[0]);
+			memcpy(filter, setsockopt_filter, sizeof(setsockopt_filter));
+			break;
 	}
 	return result;
 }
