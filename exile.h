@@ -84,22 +84,26 @@
 
 #define EXILE_SYS(x) __NR_##x
 
-#define EXILE_FS_ALLOW_READ 1<<0
-#define EXILE_FS_ALLOW_WRITE (1<<1)
+/* Allow all read-effect operations on the path */
+#define EXILE_FS_ALLOW_ALL_READ 1<<0
+/* Allow all write-effect operations on the path, such as normal writes, creation/deletion of files */
+#define EXILE_FS_ALLOW_ALL_WRITE (1<<1)
 #define EXILE_FS_ALLOW_EXEC 1<<2
 #define EXILE_FS_ALLOW_DEV 1<<3
 #define EXILE_FS_ALLOW_SETUID 1<<4
+
 //don't mount recursive
 #define EXILE_MOUNT_NOT_REC 1<<5
 
+/* Fine-granular approach available with landlock */
 #if HAVE_LANDLOCK == 1
 #define EXILE_FS_ALLOW_REMOVE_DIR		(1 << 7)
 #define EXILE_FS_ALLOW_REMOVE_FILE		(1 << 8)
-#define EXILE_FS_ALLOW_MAKE_CHAR			(1 << 9)
+#define EXILE_FS_ALLOW_MAKE_CHAR		(1 << 9)
 #define EXILE_FS_ALLOW_MAKE_DIR			(1 << 10)
 #define EXILE_FS_ALLOW_MAKE_REG			(1 << 11)
-#define EXILE_FS_ALLOW_MAKE_SOCK			(1 << 12)
-#define EXILE_FS_ALLOW_MAKE_FIFO			(1 << 13)
+#define EXILE_FS_ALLOW_MAKE_SOCK		(1 << 12)
+#define EXILE_FS_ALLOW_MAKE_FIFO		(1 << 13)
 #define EXILE_FS_ALLOW_MAKE_BLOCK		(1 << 14)
 #define EXILE_FS_ALLOW_MAKE_SYM			(1 << 15)
 #define EXILE_FS_ALLOW_WRITE_FILE 		(1 << 16)
@@ -1023,7 +1027,7 @@ static int get_policy_mount_flags(struct exile_path_policy *policy)
 		result |= MS_NOSUID;
 	}
 
-	if( (policy->policy & EXILE_FS_ALLOW_WRITE) == 0)
+	if( (policy->policy & EXILE_FS_ALLOW_ALL_WRITE) == 0)
 	{
 		result |= MS_RDONLY;
 	}
@@ -1069,7 +1073,7 @@ static int mount_to_chroot(const char *chroot_target_path, struct exile_path_pol
 		mount_flags |= MS_BIND;
 
 
-		if(path_policy->policy & EXILE_FS_ALLOW_READ || path_policy->policy & EXILE_FS_ALLOW_WRITE)
+		if(path_policy->policy & EXILE_FS_ALLOW_ALL_READ || path_policy->policy & EXILE_FS_ALLOW_ALL_WRITE)
 		{
 			ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
@@ -1329,6 +1333,19 @@ static int exile_enable_syscall_policy(struct exile_policy *policy)
 static unsigned int exile_flags_to_landlock(unsigned int flags)
 {
 	unsigned int result = 0;
+	if(flags & EXILE_FS_ALLOW_ALL_READ)
+	{
+		result |= LANDLOCK_ACCESS_FS_READ_FILE;
+		result |= LANDLOCK_ACCESS_FS_READ_DIR;
+	}
+	if(flags & EXILE_FS_ALLOW_ALL_WRITE)
+	{
+		result |= LANDLOCK_ACCESS_FS_MAKE_REG;
+		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
+		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+		result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+		result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
+	}
 	if(flags & EXILE_FS_ALLOW_DEV)
 	{
 		result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
@@ -1362,11 +1379,6 @@ static unsigned int exile_flags_to_landlock(unsigned int flags)
 	{
 		result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
 	}
-	if(flags & EXILE_FS_ALLOW_READ)
-	{
-		result |= LANDLOCK_ACCESS_FS_READ_FILE;
-		result |= LANDLOCK_ACCESS_FS_READ_DIR;
-	}
 	if(flags & EXILE_FS_ALLOW_REMOVE)
 	{
 		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
@@ -1383,11 +1395,6 @@ static unsigned int exile_flags_to_landlock(unsigned int flags)
 	if(flags & EXILE_FS_ALLOW_EXEC)
 	{
 		result |= LANDLOCK_ACCESS_FS_EXECUTE;
-	}
-	if(flags & EXILE_FS_ALLOW_WRITE)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_REG;
-		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
 	}
 	if(flags & EXILE_FS_ALLOW_WRITE_FILE)
 	{

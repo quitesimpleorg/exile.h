@@ -203,7 +203,7 @@ static int test_seccomp_group()
 int test_landlock()
 {
 	struct exile_policy *policy = exile_init_policy();
-	exile_append_path_policy(policy, EXILE_FS_ALLOW_READ, "/proc/self/fd");
+	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/proc/self/fd");
 	xexile_enable_policy(policy);
 
 	int fd = open("/", O_RDONLY | O_CLOEXEC);
@@ -217,7 +217,7 @@ int test_landlock()
 int test_landlock_deny_write()
 {
 	struct exile_policy *policy = exile_init_policy();
-	exile_append_path_policy(policy, EXILE_FS_ALLOW_READ, "/tmp/");
+	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/tmp/");
 	xexile_enable_policy(policy);
 
 	int fd = open("/tmp/a", O_WRONLY | O_CLOEXEC);
