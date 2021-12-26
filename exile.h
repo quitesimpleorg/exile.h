@@ -279,8 +279,10 @@ struct exile_path_policy
 #define EXILE_SYSCALL_PLEDGE_SCHED ((uint64_t)1<<13)
 #define EXILE_SYSCALL_PLEDGE_SHM ((uint64_t)1<<14)
 #define EXILE_SYSCALL_PLEDGE_STDIO ((uint64_t)1<<15)
-#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<16)
-#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<17)
+#define EXILE_SYSCALL_PLEDGE_THREAD ((uint64_t)1<<16)
+#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<17)
+#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<18)
+
 
 #define EXILE_SYSCALL_PLEDGE_DENY_ERROR ((uint64_t)1<<63)
 
@@ -383,7 +385,7 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(socketpair), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(setsockopt), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
 	{EXILE_SYS(getsockopt), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(clone), EXILE_SYSCALL_PLEDGE_CLONE},
+	{EXILE_SYS(clone), EXILE_SYSCALL_PLEDGE_CLONE|EXILE_SYSCALL_PLEDGE_THREAD},
 	{EXILE_SYS(fork), EXILE_SYSCALL_PLEDGE_CLONE},
 	{EXILE_SYS(vfork), EXILE_SYSCALL_PLEDGE_CLONE},
 	{EXILE_SYS(execve), EXILE_SYSCALL_PLEDGE_EXEC},
@@ -493,6 +495,7 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(fremovexattr), EXILE_SYSCALL_PLEDGE_FATTR},
 	{EXILE_SYS(tkill), EXILE_SYSCALL_PLEDGE_PROC},
 	{EXILE_SYS(time), EXILE_SYSCALL_PLEDGE_STDIO},
+	{EXILE_SYS(futex), EXILE_SYSCALL_PLEDGE_THREAD},
 	{EXILE_SYS(sched_getaffinity), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(set_thread_area), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(get_thread_area), EXILE_SYSCALL_PLEDGE_STDIO},
@@ -545,6 +548,8 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(faccessat), EXILE_SYSCALL_PLEDGE_RPATH},
 	{EXILE_SYS(pselect6), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(ppoll), EXILE_SYSCALL_PLEDGE_STDIO},
+	{EXILE_SYS(set_robust_list), EXILE_SYSCALL_PLEDGE_THREAD},
+	{EXILE_SYS(get_robust_list), EXILE_SYSCALL_PLEDGE_THREAD},
 	{EXILE_SYS(splice), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(tee), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(sync_file_range), EXILE_SYSCALL_PLEDGE_STDIO},
@@ -586,7 +591,7 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(openat2), EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH},
 	{EXILE_SYS(faccessat2), EXILE_SYSCALL_PLEDGE_RPATH},
 	{EXILE_SYS(process_madvise), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_pwait2), EXILE_SYSCALL_PLEDGE_STDIO}
+	{EXILE_SYS(epoll_pwait2), EXILE_SYSCALL_PLEDGE_STDIO},
 };
 
 
@@ -672,6 +677,21 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SO_SNDBUFFORCE, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
 	};
 
+
+	struct sock_filter clone_filter[] = {
+		/* It's the first argument for x86_64 */
+		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[0]))),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_VM, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_THREAD, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWCGROUP, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWIPC, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWNET, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWNS, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWPID, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWUSER, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWUTS, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
+	};
+
 	int result = 0;
 	int current_filter_index = 1;
 	switch(syscall)
@@ -749,6 +769,15 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			result = sizeof(setsockopt_filter)/sizeof(setsockopt_filter[0]);
 			memcpy(filter, setsockopt_filter, sizeof(setsockopt_filter));
 			break;
+		case EXILE_SYS(clone):
+			if(pledge_promises & EXILE_SYSCALL_PLEDGE_CLONE)
+			{
+				result = 0;
+				break;
+			}
+			result = sizeof(clone_filter)/sizeof(clone_filter[0]);
+			memcpy(filter, clone_filter, sizeof(clone_filter));
+			break;
 	}
 	return result;
 }
@@ -760,6 +789,13 @@ static int get_pledge_syscall_policy(long syscall,  uint64_t pledge_promises)
 	{
 		case EXILE_SYS(openat2):
 			result = EXILE_SYSCALL_DENY_RET_ERROR;
+			break;
+		case EXILE_SYS(clone3):
+			if((pledge_promises & EXILE_SYSCALL_PLEDGE_CLONE) == 0)
+			{
+				result = EXILE_SYSCALL_DENY_RET_ERROR;
+			}
+			break;
 	}
 	return result;
 }
