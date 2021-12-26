@@ -1145,7 +1145,7 @@ static int enter_namespaces(int namespace_options)
 		}
 		if(fprintf(fp, "deny") < 0)
 		{
-			EXILE_LOG_ERROR("fprintf failed while trying to write uid_map\n");
+			EXILE_LOG_ERROR("fprintf failed while trying to write setgroups\n");
 			return -1;
 		}
 		fclose(fp);
