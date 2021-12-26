@@ -273,16 +273,17 @@ struct exile_path_policy
 #define EXILE_SYSCALL_PLEDGE_FSNOTIFY ((uint64_t)1<<7)
 #define EXILE_SYSCALL_PLEDGE_ID ((uint64_t)1<<8)
 #define EXILE_SYSCALL_PLEDGE_INET ((uint64_t)1<<9)
-#define EXILE_SYSCALL_PLEDGE_PRCTL ((uint64_t)1<<10)
-#define EXILE_SYSCALL_PLEDGE_PROC ((uint64_t)1<<11)
-#define EXILE_SYSCALL_PLEDGE_PROT_EXEC ((uint64_t)1<<12)
-#define EXILE_SYSCALL_PLEDGE_RPATH ((uint64_t)1<<13)
-#define EXILE_SYSCALL_PLEDGE_SCHED ((uint64_t)1<<14)
-#define EXILE_SYSCALL_PLEDGE_SHM ((uint64_t)1<<15)
-#define EXILE_SYSCALL_PLEDGE_STDIO ((uint64_t)1<<16)
-#define EXILE_SYSCALL_PLEDGE_THREAD ((uint64_t)1<<17)
-#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<18)
-#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<19)
+#define EXILE_SYSCALL_PLEDGE_IOCTL ((uint64_t)1<<10)
+#define EXILE_SYSCALL_PLEDGE_PRCTL ((uint64_t)1<<11)
+#define EXILE_SYSCALL_PLEDGE_PROC ((uint64_t)1<<12)
+#define EXILE_SYSCALL_PLEDGE_PROT_EXEC ((uint64_t)1<<13)
+#define EXILE_SYSCALL_PLEDGE_RPATH ((uint64_t)1<<14)
+#define EXILE_SYSCALL_PLEDGE_SCHED ((uint64_t)1<<15)
+#define EXILE_SYSCALL_PLEDGE_SHM ((uint64_t)1<<16)
+#define EXILE_SYSCALL_PLEDGE_STDIO ((uint64_t)1<<17)
+#define EXILE_SYSCALL_PLEDGE_THREAD ((uint64_t)1<<18)
+#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<19)
+#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<20)
 
 #define EXILE_SYSCALL_PLEDGE_DENY_ERROR ((uint64_t)1<<63)
 
@@ -345,7 +346,7 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(rt_sigaction), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(rt_sigprocmask), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(rt_sigreturn), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(ioctl), EXILE_SYSCALL_PLEDGE_STDIO},
+	{EXILE_SYS(ioctl), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_IOCTL},
 	{EXILE_SYS(pread64), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(pwrite64), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(readv), EXILE_SYSCALL_PLEDGE_STDIO},
@@ -719,6 +720,11 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			}
 			break;
 		case EXILE_SYS(ioctl):
+			if(pledge_promises & EXILE_SYSCALL_PLEDGE_IOCTL)
+			{
+				result = 0;
+				break;
+			}
 			if(pledge_promises & EXILE_SYSCALL_PLEDGE_STDIO)
 			{
 				result = sizeof(ioctl_default)/sizeof(ioctl_default[0]);
