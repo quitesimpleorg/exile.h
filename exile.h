@@ -1774,3 +1774,58 @@ int exile_enable_policy(struct exile_policy *policy)
 	return 0;
 }
 #endif
+
+
+/* Convenience wrapper for the pledge-related subset of exile.h
+ *
+ * Only installs seccomp filters for the specified pledge promises.
+ *
+ * Useful if only pledge is required from exile.h, but nothing else
+ *
+ * As with OpenBSD's, subsequent calls can only reduce allowed syscalls.
+ *
+ * Here, adding more promises than a previous call set may return success, but
+ * won't be allowed during execution.
+ *
+ * Due to the nature of seccomp, it's furthermore required the EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL promise
+ * is set if further calls are expected. Generally, it's reasonable for the last call to
+ * exile_pledge() a program makes to not set EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL.
+ *
+ * There are no seperate exec_promises. All children of the process inherit the filter.
+ * .
+ * Return value: 0 on success, any other value on failure.
+ */
+int exile_pledge(uint64_t promises)
+{
+	struct __user_cap_header_struct h = { 0 };
+	h.pid = 0;
+	h.version = _LINUX_CAPABILITY_VERSION_3;
+	struct __user_cap_data_struct cap[2];
+	cap[0].effective = 0;
+	cap[0].permitted = 0;
+	cap[0].inheritable = 0;
+	cap[1].effective = 0;
+	cap[1].permitted = 0;
+	cap[1].inheritable = 0;
+	if(capget(&h, cap) == -1)
+	{
+		EXILE_LOG_ERROR("Failed to get capabilities: %s\n", strerror(errno));
+		return -errno;
+	}
+
+	struct exile_policy *policy = exile_create_policy();
+	if(policy == NULL)
+	{
+		EXILE_LOG_ERROR("Failed to create policy\n");
+		return 1;
+	}
+
+	policy->pledge_promises = promises;
+	if((cap[0].effective & (1<<CAP_SYS_ADMIN)) == 0)
+	{
+		policy->no_new_privs = 1;
+	}
+	int ret = exile_enable_policy(policy);
+	exile_free_policy(policy);
+	return ret;
+}
