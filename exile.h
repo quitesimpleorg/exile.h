@@ -1656,6 +1656,17 @@ int exile_enable_policy(struct exile_policy *policy)
 			EXILE_LOG_ERROR("chroot: failed to enter %s\n", policy->chroot_target_path);
 			return -1;
 		}
+		const char *chdir_target_path = policy->chdir_path;
+		if(chdir_target_path == NULL)
+		{
+			chdir_target_path = "/";
+		}
+
+		if(chdir(chdir_target_path) < 0)
+		{
+			EXILE_LOG_ERROR("chdir to %s failed\n", policy->chdir_path);
+			return -1;
+		}
 	}
 
 #if HAVE_LANDLOCK == 1
@@ -1670,16 +1681,6 @@ int exile_enable_policy(struct exile_policy *policy)
 		}
 	}
 #endif
-	if(policy->chdir_path == NULL)
-	{
-		policy->chdir_path = "/";
-	}
-
-	if(policy->chdir_path != NULL && chdir(policy->chdir_path) < 0)
-	{
-		EXILE_LOG_ERROR("chdir to %s failed\n", policy->chdir_path);
-		return -1;
-	}
 
 	if(policy->no_fs)
 	{
@@ -1741,6 +1742,7 @@ int exile_enable_policy(struct exile_policy *policy)
 	{
 		return exile_enable_syscall_policy(policy);
 	}
+
 
 	return 0;
 }
