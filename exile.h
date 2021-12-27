@@ -664,7 +664,7 @@ int exile_append_syscall_default_policy(struct exile_policy *exile_policy, unsig
 	Returns: 0 if none copied, otherwise the number of entries in "filter".
  */
 
-static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct sock_filter *filter)
+static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct sock_filter *filter , int *policy)
 {
 
 	/* How to read this:
@@ -733,6 +733,7 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 		EXILE_BPF_CMP_EQ(PR_CAPBSET_READ, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
 	};
 
+	*policy = EXILE_SYSCALL_ALLOW;
 	int result = 0;
 	int current_filter_index = 1;
 	switch(syscall)
@@ -794,6 +795,10 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			result = sizeof(open_rdonly)/sizeof(open_rdonly[0]);
 			memcpy(filter, open_rdonly, sizeof(open_rdonly));
 			break;
+		case EXILE_SYS(openat2):
+			result = 0;
+			*policy = EXILE_SYSCALL_DENY_RET_ERROR;
+			break;
 		case EXILE_SYS(socket):
 			if(pledge_promises & EXILE_SYSCALL_PLEDGE_UNIX)
 			{
@@ -824,6 +829,13 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			result = sizeof(clone_filter)/sizeof(clone_filter[0]);
 			memcpy(filter, clone_filter, sizeof(clone_filter));
 			break;
+		case EXILE_SYS(clone3):
+			if((pledge_promises & EXILE_SYSCALL_PLEDGE_CLONE) == 0)
+			{
+				result = 0;
+				*policy = EXILE_SYSCALL_DENY_RET_ERROR;
+			}
+			break;
 		case EXILE_SYS(prctl):
 			if(pledge_promises & EXILE_SYSCALL_PLEDGE_PRCTL)
 			{
@@ -841,27 +853,8 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 	return result;
 }
 
-static int get_pledge_syscall_policy(long syscall,  uint64_t pledge_promises)
-{
-	int result = EXILE_SYSCALL_ALLOW;
-	switch(syscall)
-	{
-		case EXILE_SYS(openat2):
-			result = EXILE_SYSCALL_DENY_RET_ERROR;
-			break;
-		case EXILE_SYS(clone3):
-			if((pledge_promises & EXILE_SYSCALL_PLEDGE_CLONE) == 0)
-			{
-				result = EXILE_SYSCALL_DENY_RET_ERROR;
-			}
-			break;
-	}
-	return result;
-}
-
 int exile_append_pledge_promises(struct exile_policy *policy, uint64_t pledge_promises)
 {
-
 	for(unsigned int i = 0; i < sizeof(exile_pledge_map)/sizeof(exile_pledge_map[0]); i++)
 	{
 		struct syscall_pledge_map *current_map = &exile_pledge_map[i];
@@ -869,8 +862,8 @@ int exile_append_pledge_promises(struct exile_policy *policy, uint64_t pledge_pr
 		{
 			struct sock_filter filter[EXILE_ARGFILTERS_COUNT];
 			long syscall = current_map->syscall;
-			int syscall_policy = get_pledge_syscall_policy(syscall, pledge_promises);
-			int argfilters = get_pledge_argfilter(syscall, pledge_promises, filter);
+			int syscall_policy = EXILE_SYSCALL_ALLOW;
+			int argfilters = get_pledge_argfilter(syscall, pledge_promises, filter, &syscall_policy);
 			int ret = exile_append_syscall_policy(policy, syscall, syscall_policy, filter, argfilters);
 			if(ret != 0)
 			{
