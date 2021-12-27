@@ -43,10 +43,14 @@
 #include <linux/seccomp.h>
 #include <linux/version.h>
 #include <linux/audit.h>
-#include <sys/capability.h>
+#include <linux/capability.h>
 #include <stddef.h>
 #include <inttypes.h>
 #include <asm/unistd.h>
+
+#define capget(hdrp,datap) syscall(__NR_capget,hdrp,datap)
+#define capset(hdrp,datap) syscall(__NR_capset,hdrp,datap)
+
 
 #ifndef HAVE_LANDLOCK
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,13,0)
