@@ -848,31 +848,40 @@ int exile_append_pledge_promises(struct exile_policy *policy, uint64_t pledge_pr
 	return exile_append_syscall_default_policy(policy, pledge_policy);
 }
 
-
-/* Creates the default policy
- * Must be freed using exile_free_policy
- * @returns: default policy */
-struct exile_policy *exile_init_policy()
+/* Creates an empty policy struct without opinionated defaults.
+ *
+ * Must be freed using exile_free_policy()
+ * @returns: empty policy
+ */
+struct exile_policy *exile_create_policy()
 {
 	struct exile_policy *result = (struct exile_policy *) calloc(1, sizeof(struct exile_policy));
+	if(result == NULL)
+	{
+		EXILE_LOG_ERROR("Failed to allocate memory for policy\n");
+		return NULL;
+	}
+	result->path_policies_tail = &(result->path_policies);
+	result->syscall_policies_tail = &(result->syscall_policies);
+	return result;
+}
+
+/* Creates the default policy
+ * Must be freed using exile_free_policy()
+ *
+ * @returns: default policy
+ */
+struct exile_policy *exile_init_policy()
+{
+	struct exile_policy *result = exile_create_policy();
+	if(result == NULL)
+	{
+		return NULL;
+	}
 	result->drop_caps = 1;
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
-	result->no_fs = 0;
-	result->no_new_fds = 0;
 	result->namespace_options = EXILE_UNSHARE_MOUNT | EXILE_UNSHARE_USER;
-	result->disable_syscall_filter = 0;
-	result->chdir_path = NULL;
-	result->mount_path_policies_to_chroot = 0;
-	result->chroot_target_path[0] = '\0';
-	result->path_policies = NULL;
-	result->path_policies_tail = &(result->path_policies);
-
-	result->pledge_promises = 0;
-
-	result->syscall_policies = NULL;
-	result->syscall_policies_tail = &(result->syscall_policies);
-
 	return result;
 }
 
@@ -1757,6 +1766,3 @@ int exile_enable_policy(struct exile_policy *policy)
 	return 0;
 }
 #endif
-
-
-
