@@ -697,6 +697,8 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 
 	struct sock_filter prctl_default[] ={
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[0]))),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_NO_NEW_PRIVS, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_GET_NO_NEW_PRIVS, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
 		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_GET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
 		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
 		EXILE_BPF_NOP,
