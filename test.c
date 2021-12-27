@@ -347,6 +347,54 @@ int test_seccomp_pledge()
 	return 0;
 }
 
+int test_seccomp_exile_pledge_multiple()
+{
+
+	int ret = exile_pledge(EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_UNIX | EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL | EXILE_SYSCALL_PLEDGE_DENY_ERROR);
+	if(ret != 0)
+	{
+		printf("Failed: exile_pledge() call 1 failed\n");
+		return 1;
+	}
+	int s = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(s == -1)
+	{
+		printf("Failed: socket was expected to succeed, but returned %i\n", s);
+		return 1;
+	}
+
+	/* Let's take away unix sockets, so it should not be possible anymore */
+	ret = exile_pledge(EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL | EXILE_SYSCALL_PLEDGE_DENY_ERROR);
+	if(ret != 0)
+	{
+		printf("Failed: exile_pledge() call 2 failed\n");
+		return 1;
+	}
+	s = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(s != -1)
+	{
+		printf("Failed: socket was expected to fail, but returned %i\n", s);
+		return 1;
+	}
+
+	/* Let's try to regain unix sockets again */
+	ret = exile_pledge(EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_UNIX | EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL | EXILE_SYSCALL_PLEDGE_DENY_ERROR);
+	if(ret != 0)
+	{
+		printf("Failed: exile_pledge() call 3 failed\n");
+		return 1;
+	}
+	s = socket(AF_UNIX, SOCK_STREAM, 0);
+	if(s != -1)
+	{
+		printf("Failed: socket was still expected to fail, but returned %i\n", s);
+		return 1;
+	}
+
+	return 0;
+}
+
+
 #if HAVE_LANDLOCK == 1
 int test_landlock()
 {
@@ -451,6 +499,7 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-argfilter-filtered", &test_seccomp_argfilter_filtered},
 	{ "seccomp-argfilter-mixed", &test_seccomp_argfilter_mixed},
 	{ "seccomp-pledge", &test_seccomp_pledge},
+	{ "seccomp-pledge-exile_pledge-multi", &test_seccomp_exile_pledge_multiple},
 	{ "landlock", &test_landlock},
 	{ "landlock-deny-write", &test_landlock_deny_write },
 	{ "no_fs", &test_nofs},
