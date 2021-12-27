@@ -632,6 +632,18 @@ static int is_valid_syscall_policy(unsigned int policy)
 	return policy == EXILE_SYSCALL_ALLOW || policy == EXILE_SYSCALL_DENY_RET_ERROR || policy == EXILE_SYSCALL_DENY_KILL_PROCESS;
 }
 
+/*
+ * If we can use landlock, return 1, otherwise 0
+ */
+int exile_landlock_is_available()
+{
+	#if HAVE_LANDLOCK == 1
+	int ruleset = landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+	return ruleset == 1;
+	#endif
+	return 0;
+}
+
 int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall, unsigned int syscall_policy, struct sock_filter *argfilters, size_t n)
 {
 	struct exile_syscall_policy *newpolicy = (struct exile_syscall_policy *) calloc(1, sizeof(struct exile_syscall_policy));
@@ -1074,6 +1086,19 @@ static int get_policy_mount_flags(struct exile_path_policy *policy)
 		result |= MS_REC;
 	}
 	return result;
+}
+
+static int path_policy_needs_landlock(struct exile_path_policy *path_policy)
+{
+	unsigned int policy = path_policy->policy;
+#if HAVE_LANDLOCK == 1
+	if(policy >= EXILE_FS_ALLOW_REMOVE_DIR)
+	{
+		return 1;
+	}
+#endif
+	//Can't need it if we don't have support at compile time
+	return 0;
 }
 
 /* Helper to mount directories into the chroot path "chroot_target_path"
@@ -1521,6 +1546,21 @@ static int check_policy_sanity(struct exile_policy *policy)
 		}
 	}
 
+	int can_use_landlock = exile_landlock_is_available();
+	struct exile_path_policy *path_policy = policy->path_policies;
+	while(path_policy)
+	{
+		if(path_policy_needs_landlock(path_policy))
+		{
+			if(!can_use_landlock)
+			{
+				EXILE_LOG_ERROR("Error: A path policy needs landlock, but landlock is not available. Fallback not possible\n");
+				return -1;
+			}
+		}
+		path_policy = path_policy->next;
+	}
+
 	/* TODO: check if we have ALLOWED, but no default deny */
 
 	if(policy->mount_path_policies_to_chroot == 1)
@@ -1662,7 +1702,12 @@ int exile_enable_policy(struct exile_policy *policy)
 		return -1;
 	}
 
-	if(policy->mount_path_policies_to_chroot && policy->path_policies != NULL)
+	int can_use_landlock = exile_landlock_is_available();
+
+
+	/* Fallback to chroot mechanism to enforce policies. Ignore mount_path_policies_to_chroot
+	 * if we have no other option (so no landlock) */
+	if((policy->mount_path_policies_to_chroot || !can_use_landlock) && policy->path_policies != NULL)
 	{
 		if(*policy->chroot_target_path == '\0')
 		{
@@ -1717,7 +1762,7 @@ int exile_enable_policy(struct exile_policy *policy)
 
 #if HAVE_LANDLOCK == 1
 	int landlock_ruleset_fd = -1;
-	if(policy->path_policies != NULL)
+	if(can_use_landlock && policy->path_policies != NULL)
 	{
 		landlock_ruleset_fd = landlock_prepare_ruleset(policy->path_policies);
 		if(landlock_ruleset_fd < 0)
@@ -1775,7 +1820,7 @@ int exile_enable_policy(struct exile_policy *policy)
 	}
 
 #if HAVE_LANDLOCK == 1
-	if (policy->path_policies != NULL && landlock_restrict_self(landlock_ruleset_fd, 0) != 0)
+	if (can_use_landlock && policy->path_policies != NULL && landlock_restrict_self(landlock_ruleset_fd, 0) != 0)
 	{
 		perror("Failed to enforce ruleset");
 		close(landlock_ruleset_fd);

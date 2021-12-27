@@ -398,6 +398,11 @@ int test_seccomp_exile_pledge_multiple()
 #if HAVE_LANDLOCK == 1
 int test_landlock()
 {
+	if(!exile_landlock_is_available())
+	{
+		printf("landlock not available, so cannot test\n");
+		return 1;
+	}
 	struct exile_policy *policy = exile_init_policy();
 	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/proc/self/fd");
 	xexile_enable_policy(policy);
