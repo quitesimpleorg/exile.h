@@ -195,6 +195,9 @@ static inline int landlock_restrict_self(const int ruleset_fd,
 #ifndef __NR_clone3
 #define __NR_clone3 435
 #endif
+#ifndef __NR_futex_waitv
+#define __NR_futex_waitv 449
+#endif
 #ifndef __NR_close_range
 #define __NR_close_range 436
 #endif
@@ -619,7 +622,8 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(openat2), EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH},
 	{EXILE_SYS(faccessat2), EXILE_SYSCALL_PLEDGE_RPATH},
 	{EXILE_SYS(process_madvise), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_pwait2), EXILE_SYSCALL_PLEDGE_STDIO}
+	{EXILE_SYS(epoll_pwait2), EXILE_SYSCALL_PLEDGE_STDIO},
+	{EXILE_SYS(futex_waitv), EXILE_SYSCALL_PLEDGE_THREAD}
 };
 
 
