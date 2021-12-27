@@ -279,11 +279,12 @@ struct exile_path_policy
 #define EXILE_SYSCALL_PLEDGE_PROT_EXEC ((uint64_t)1<<13)
 #define EXILE_SYSCALL_PLEDGE_RPATH ((uint64_t)1<<14)
 #define EXILE_SYSCALL_PLEDGE_SCHED ((uint64_t)1<<15)
-#define EXILE_SYSCALL_PLEDGE_SHM ((uint64_t)1<<16)
-#define EXILE_SYSCALL_PLEDGE_STDIO ((uint64_t)1<<17)
-#define EXILE_SYSCALL_PLEDGE_THREAD ((uint64_t)1<<18)
-#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<19)
-#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<20)
+#define EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL ((uint64_t)1<<16)
+#define EXILE_SYSCALL_PLEDGE_SHM ((uint64_t)1<<17)
+#define EXILE_SYSCALL_PLEDGE_STDIO ((uint64_t)1<<18)
+#define EXILE_SYSCALL_PLEDGE_THREAD ((uint64_t)1<<19)
+#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<20)
+#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<21)
 
 #define EXILE_SYSCALL_PLEDGE_DENY_ERROR ((uint64_t)1<<63)
 
@@ -478,7 +479,7 @@ static struct syscall_pledge_map exile_pledge_map[] =
 	{EXILE_SYS(mlockall), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(munlockall), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(vhangup), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(prctl), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_PRCTL},
+	{EXILE_SYS(prctl), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_PRCTL|EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL},
 	{EXILE_SYS(setrlimit), EXILE_SYSCALL_PLEDGE_PROC},
 	{EXILE_SYS(sync), EXILE_SYSCALL_PLEDGE_STDIO},
 	{EXILE_SYS(gettid), EXILE_SYSCALL_PLEDGE_STDIO},
@@ -696,9 +697,10 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 
 	struct sock_filter prctl_default[] ={
 		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[0]))),
-                BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_GET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-                BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-                BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_CAPBSET_READ, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_GET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
+		EXILE_BPF_NOP,
+		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_CAPBSET_READ, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
 	};
 
 	int result = 0;
@@ -797,6 +799,10 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			{
 				result = 0;
 				break;
+			}
+			if(pledge_promises & EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL)
+			{
+				prctl_default[3] = (struct sock_filter) BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_SECCOMP, EXILE_SYSCALL_EXIT_BPF_RETURN, 0);
 			}
 			result = sizeof(prctl_default)/sizeof(prctl_default[0]);
 			memcpy(filter, prctl_default, sizeof(prctl_default));
