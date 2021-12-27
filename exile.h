@@ -68,13 +68,6 @@
 #error Seccomp support has not been tested for exile.h for this platform yet
 #endif
 
-#define SYSCALL(nr, jt) \
-	BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, (nr), 0, 1), jt
-
-
-#define EXILE_BPF_NOP \
-	BPF_STMT(BPF_JMP+BPF_JA,0)
-
 #define EXILE_UNSHARE_NETWORK 1<<1
 #define EXILE_UNSHARE_USER 1<<2
 #define EXILE_UNSHARE_MOUNT 1<<3
@@ -262,6 +255,34 @@ struct exile_path_policy
 #define EXILE_SYSCALL_ALLOW 1
 #define EXILE_SYSCALL_DENY_KILL_PROCESS 2
 #define EXILE_SYSCALL_DENY_RET_ERROR 3
+
+#define EXILE_BPF_NOP \
+BPF_STMT(BPF_JMP+BPF_JA,0)
+
+#define EXILE_BPF_LOAD_SECCOMP_ARG(nr) \
+BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[nr])))
+
+#define EXILE_BPF_CMP_EQ(val,t,f) \
+BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, val, t, f)
+
+#define EXILE_BPF_CMP_SET(val,t,f) \
+BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, val, t, f)
+
+/* Immediatly go to the syscall action, do not process any other arg filters */
+#define EXILE_BPF_MATCH(argval) \
+	EXILE_BPF_CMP_EQ(argval,  EXILE_SYSCALL_EXIT_BPF_RETURN, 0)
+
+#define EXILE_BPF_MATCH_SET(argval) \
+	EXILE_BPF_CMP_SET(argval, EXILE_SYSCALL_EXIT_BPF_RETURN, 0)
+
+/* Immediatly go beyond the syscall action, do not process any other arg filters. What to do with this syscall
+is thus up to the default policy  */
+#define EXILE_BPF_NO_MATCH(argval) \
+	EXILE_BPF_CMP_EQ(argval, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
+
+#define EXILE_BPF_NO_MATCH_SET(argval) \
+	EXILE_BPF_CMP_SET(argval, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
+
 
 /* Pledge definitions */
 #define EXILE_SYSCALL_PLEDGE_CHOWN ((uint64_t)1<<1)
@@ -645,64 +666,71 @@ int exile_append_syscall_default_policy(struct exile_policy *exile_policy, unsig
 
 static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct sock_filter *filter)
 {
+
+	/* How to read this:
+	 * Keep in mind our default action is do deny, unless it's a syscall from an pledge promise. Then it will be
+	 * accepted if the argument values are good (if we care about them at all).
+	 * EXILE_BPF_MATCH() means the argument value is good, and the syscall can be accepted
+	 * EXILE_BPF_NO_MATCH() means the syscall won't be allowed because the value is illegal
+	 */
 	struct sock_filter mmap_no_exec[] = {
-		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[2]))),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, PROT_EXEC, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)};
+		EXILE_BPF_LOAD_SECCOMP_ARG(2),
+		EXILE_BPF_NO_MATCH(PROT_EXEC)
+	};
 
 	struct sock_filter ioctl_default[] = {
-			BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
-			BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, FIONREAD, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-			BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, FIONBIO, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-			BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, FIOCLEX, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-			BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, FIONCLEX, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
-		};
+			EXILE_BPF_LOAD_SECCOMP_ARG(1),
+			EXILE_BPF_MATCH(FIONREAD),
+			EXILE_BPF_MATCH(FIONBIO),
+			EXILE_BPF_MATCH(FIOCLEX),
+			EXILE_BPF_CMP_EQ(FIONCLEX, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+	};
 
 	/* open() and friends with read-only flags */
 	struct sock_filter open_rdonly[] = {
-		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[1]))),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_CREAT, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_TMPFILE, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_WRONLY, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_RDWR, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, O_APPEND, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
+		EXILE_BPF_LOAD_SECCOMP_ARG(1),
+		EXILE_BPF_NO_MATCH_SET(O_CREAT),
+		EXILE_BPF_NO_MATCH_SET(O_TMPFILE),
+		EXILE_BPF_NO_MATCH_SET(O_WRONLY),
+		EXILE_BPF_NO_MATCH_SET(O_RDWR),
+		EXILE_BPF_NO_MATCH_SET(O_APPEND),
 	};
 
 	struct sock_filter socket_filter[4] = {
-		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[0]))),
+		EXILE_BPF_LOAD_SECCOMP_ARG(0),
 		EXILE_BPF_NOP,
 		EXILE_BPF_NOP,
 		EXILE_BPF_NOP
 	};
 
 	struct sock_filter setsockopt_filter[] = {
-		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[2]))),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SO_DEBUG, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SO_SNDBUFFORCE, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
+		EXILE_BPF_LOAD_SECCOMP_ARG(2),
+		EXILE_BPF_NO_MATCH(SO_DEBUG),
+		EXILE_BPF_NO_MATCH(SO_SNDBUFFORCE)
 	};
 
 
 	struct sock_filter clone_filter[] = {
 		/* It's the first argument for x86_64 */
-		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[0]))),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_VM, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_THREAD, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWCGROUP, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWIPC, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWNET, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWNS, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWPID, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWUSER, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0),
-		BPF_JUMP(BPF_JMP+BPF_JSET+BPF_K, CLONE_NEWUTS, EXILE_SYSCALL_EXIT_BPF_NO_MATCH, 0)
+		EXILE_BPF_LOAD_SECCOMP_ARG(0),
+		EXILE_BPF_NO_MATCH_SET(CLONE_VM),
+		EXILE_BPF_NO_MATCH_SET(CLONE_THREAD),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWCGROUP),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWIPC),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWNET),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWNS),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWPID),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWUSER),
+		EXILE_BPF_NO_MATCH_SET(CLONE_NEWUTS),
 	};
 
 	struct sock_filter prctl_default[] ={
-		BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[0]))),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_NO_NEW_PRIVS, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_GET_NO_NEW_PRIVS, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_GET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_NAME, EXILE_SYSCALL_EXIT_BPF_RETURN, 0),
-		EXILE_BPF_NOP,
-		BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_CAPBSET_READ, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
+		EXILE_BPF_LOAD_SECCOMP_ARG(0),
+		EXILE_BPF_MATCH(PR_SET_NO_NEW_PRIVS),
+		EXILE_BPF_MATCH(PR_GET_NO_NEW_PRIVS),
+		EXILE_BPF_MATCH(PR_GET_NAME),
+		EXILE_BPF_MATCH(PR_SET_NAME),
+		EXILE_BPF_CMP_EQ(PR_CAPBSET_READ, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
 	};
 
 	int result = 0;
@@ -769,14 +797,14 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 		case EXILE_SYS(socket):
 			if(pledge_promises & EXILE_SYSCALL_PLEDGE_UNIX)
 			{
-				socket_filter[current_filter_index] = (struct sock_filter) BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, AF_UNIX, EXILE_SYSCALL_EXIT_BPF_RETURN, 0);
+				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_UNIX);
 				++current_filter_index;
 			}
 			if(pledge_promises & EXILE_SYSCALL_PLEDGE_INET)
 			{
-				socket_filter[current_filter_index] = (struct sock_filter) BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, AF_INET, EXILE_SYSCALL_EXIT_BPF_RETURN, 0);
+				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_INET);
 				++current_filter_index;
-				socket_filter[current_filter_index] = (struct sock_filter) BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, AF_INET6, EXILE_SYSCALL_EXIT_BPF_RETURN, 0);
+				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_INET6);
 				++current_filter_index;
 			}
 			socket_filter[current_filter_index-1].jf = EXILE_SYSCALL_EXIT_BPF_NO_MATCH;
@@ -804,7 +832,7 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			}
 			if(pledge_promises & EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL)
 			{
-				prctl_default[3] = (struct sock_filter) BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, PR_SET_SECCOMP, EXILE_SYSCALL_EXIT_BPF_RETURN, 0);
+				prctl_default[3] = (struct sock_filter) EXILE_BPF_MATCH(PR_SET_SECCOMP);
 			}
 			result = sizeof(prctl_default)/sizeof(prctl_default[0]);
 			memcpy(filter, prctl_default, sizeof(prctl_default));
@@ -1278,7 +1306,7 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 					/* TODO: Return error */
 					return;
 			}
-			struct sock_filter syscall_check = BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, (unsigned int) syscall, 0, next_syscall_pc);
+			struct sock_filter syscall_check = EXILE_BPF_CMP_EQ((unsigned int) syscall, 0, next_syscall_pc);
 			filter[(*start_index)++] = syscall_check;
 			--next_syscall_pc;
 
