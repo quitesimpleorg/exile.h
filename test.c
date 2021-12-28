@@ -282,10 +282,10 @@ int test_seccomp_argfilter_mixed()
 }
 
 
-int do_test_seccomp_pledge_socket()
+int do_test_seccomp_vow_socket()
 {
 	struct exile_policy *policy = exile_init_policy();
-	policy->pledge_promises = EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_INET | EXILE_SYSCALL_PLEDGE_DENY_ERROR;
+	policy->vow_promises = EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_INET | EXILE_SYSCALL_VOW_DENY_ERROR;
 	xexile_enable_policy(policy);
 
 	int s = socket(AF_INET, SOCK_STREAM, 0);
@@ -303,10 +303,10 @@ int do_test_seccomp_pledge_socket()
 	return 0;
 }
 
-int do_test_seccomp_pledge_open()
+int do_test_seccomp_vow_open()
 {
 	struct exile_policy *policy = exile_init_policy();
-	policy->pledge_promises = EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_RPATH | EXILE_SYSCALL_PLEDGE_DENY_ERROR;
+	policy->vow_promises = EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_RPATH | EXILE_SYSCALL_VOW_DENY_ERROR;
 	xexile_enable_policy(policy);
 
 	int ret = open("/dev/urandom", O_WRONLY  | O_APPEND);
@@ -330,30 +330,30 @@ int do_test_seccomp_pledge_open()
 	return 0;
 }
 
-int test_seccomp_pledge()
+int test_seccomp_vow()
 {
-	int ret = test_successful_exit(&do_test_seccomp_pledge_open);
+	int ret = test_successful_exit(&do_test_seccomp_vow_open);
 	if(ret != 0)
 	{
-		printf("Failed: do_test_seccomp_pledge_open()\n");
+		printf("Failed: do_test_seccomp_vow_open()\n");
 		return 1;
 	}
-	ret = test_successful_exit(&do_test_seccomp_pledge_socket);
+	ret = test_successful_exit(&do_test_seccomp_vow_socket);
 	if(ret != 0)
 	{
-		printf("Failed: do_test_seccomp_pledge_socket()\n");
+		printf("Failed: do_test_seccomp_vow_socket()\n");
 		return 1;
 	}
 	return 0;
 }
 
-int test_seccomp_exile_pledge_multiple()
+int test_seccomp_exile_vow_multiple()
 {
 
-	int ret = exile_pledge(EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_UNIX | EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL | EXILE_SYSCALL_PLEDGE_DENY_ERROR);
+	int ret = exile_vow(EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_UNIX | EXILE_SYSCALL_VOW_SECCOMP_INSTALL | EXILE_SYSCALL_VOW_DENY_ERROR);
 	if(ret != 0)
 	{
-		printf("Failed: exile_pledge() call 1 failed\n");
+		printf("Failed: exile_vow() call 1 failed\n");
 		return 1;
 	}
 	int s = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -364,10 +364,10 @@ int test_seccomp_exile_pledge_multiple()
 	}
 
 	/* Let's take away unix sockets, so it should not be possible anymore */
-	ret = exile_pledge(EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL | EXILE_SYSCALL_PLEDGE_DENY_ERROR);
+	ret = exile_vow(EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_SECCOMP_INSTALL | EXILE_SYSCALL_VOW_DENY_ERROR);
 	if(ret != 0)
 	{
-		printf("Failed: exile_pledge() call 2 failed\n");
+		printf("Failed: exile_vow() call 2 failed\n");
 		return 1;
 	}
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -378,10 +378,10 @@ int test_seccomp_exile_pledge_multiple()
 	}
 
 	/* Let's try to regain unix sockets again */
-	ret = exile_pledge(EXILE_SYSCALL_PLEDGE_STDIO | EXILE_SYSCALL_PLEDGE_UNIX | EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL | EXILE_SYSCALL_PLEDGE_DENY_ERROR);
+	ret = exile_vow(EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_UNIX | EXILE_SYSCALL_VOW_SECCOMP_INSTALL | EXILE_SYSCALL_VOW_DENY_ERROR);
 	if(ret != 0)
 	{
-		printf("Failed: exile_pledge() call 3 failed\n");
+		printf("Failed: exile_vow() call 3 failed\n");
 		return 1;
 	}
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -503,8 +503,8 @@ struct dispatcher dispatchers[] = {
 	{ "seccomp-argfilter-allowed", &test_seccomp_argfilter_allowed},
 	{ "seccomp-argfilter-filtered", &test_seccomp_argfilter_filtered},
 	{ "seccomp-argfilter-mixed", &test_seccomp_argfilter_mixed},
-	{ "seccomp-pledge", &test_seccomp_pledge},
-	{ "seccomp-pledge-exile_pledge-multi", &test_seccomp_exile_pledge_multiple},
+	{ "seccomp-vow", &test_seccomp_vow},
+	{ "seccomp-vow-exile_vow-multi", &test_seccomp_exile_vow_multiple},
 	{ "landlock", &test_landlock},
 	{ "landlock-deny-write", &test_landlock_deny_write },
 	{ "no_fs", &test_nofs},

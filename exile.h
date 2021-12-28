@@ -239,10 +239,10 @@ static inline int landlock_restrict_self(const int ruleset_fd,
 #endif
 #endif
 
-struct syscall_pledge_map
+struct syscall_vow_map
 {
 	long syscall;
-	uint64_t pledgemask;
+	uint64_t vowmask;
 };
 
 struct exile_path_policy
@@ -292,29 +292,29 @@ is thus up to the default policy  */
 
 
 /* Pledge definitions */
-#define EXILE_SYSCALL_PLEDGE_CHOWN ((uint64_t)1<<1)
-#define EXILE_SYSCALL_PLEDGE_CLONE ((uint64_t)1<<2)
-#define EXILE_SYSCALL_PLEDGE_CPATH ((uint64_t)1<<3)
-#define EXILE_SYSCALL_PLEDGE_DPATH ((uint64_t)1<<4)
-#define EXILE_SYSCALL_PLEDGE_EXEC ((uint64_t)1<<5)
-#define EXILE_SYSCALL_PLEDGE_FATTR ((uint64_t)1<<6)
-#define EXILE_SYSCALL_PLEDGE_FSNOTIFY ((uint64_t)1<<7)
-#define EXILE_SYSCALL_PLEDGE_ID ((uint64_t)1<<8)
-#define EXILE_SYSCALL_PLEDGE_INET ((uint64_t)1<<9)
-#define EXILE_SYSCALL_PLEDGE_IOCTL ((uint64_t)1<<10)
-#define EXILE_SYSCALL_PLEDGE_PRCTL ((uint64_t)1<<11)
-#define EXILE_SYSCALL_PLEDGE_PROC ((uint64_t)1<<12)
-#define EXILE_SYSCALL_PLEDGE_PROT_EXEC ((uint64_t)1<<13)
-#define EXILE_SYSCALL_PLEDGE_RPATH ((uint64_t)1<<14)
-#define EXILE_SYSCALL_PLEDGE_SCHED ((uint64_t)1<<15)
-#define EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL ((uint64_t)1<<16)
-#define EXILE_SYSCALL_PLEDGE_SHM ((uint64_t)1<<17)
-#define EXILE_SYSCALL_PLEDGE_STDIO ((uint64_t)1<<18)
-#define EXILE_SYSCALL_PLEDGE_THREAD ((uint64_t)1<<19)
-#define EXILE_SYSCALL_PLEDGE_UNIX ((uint64_t)1<<20)
-#define EXILE_SYSCALL_PLEDGE_WPATH ((uint64_t)1<<21)
+#define EXILE_SYSCALL_VOW_CHOWN ((uint64_t)1<<1)
+#define EXILE_SYSCALL_VOW_CLONE ((uint64_t)1<<2)
+#define EXILE_SYSCALL_VOW_CPATH ((uint64_t)1<<3)
+#define EXILE_SYSCALL_VOW_DPATH ((uint64_t)1<<4)
+#define EXILE_SYSCALL_VOW_EXEC ((uint64_t)1<<5)
+#define EXILE_SYSCALL_VOW_FATTR ((uint64_t)1<<6)
+#define EXILE_SYSCALL_VOW_FSNOTIFY ((uint64_t)1<<7)
+#define EXILE_SYSCALL_VOW_ID ((uint64_t)1<<8)
+#define EXILE_SYSCALL_VOW_INET ((uint64_t)1<<9)
+#define EXILE_SYSCALL_VOW_IOCTL ((uint64_t)1<<10)
+#define EXILE_SYSCALL_VOW_PRCTL ((uint64_t)1<<11)
+#define EXILE_SYSCALL_VOW_PROC ((uint64_t)1<<12)
+#define EXILE_SYSCALL_VOW_PROT_EXEC ((uint64_t)1<<13)
+#define EXILE_SYSCALL_VOW_RPATH ((uint64_t)1<<14)
+#define EXILE_SYSCALL_VOW_SCHED ((uint64_t)1<<15)
+#define EXILE_SYSCALL_VOW_SECCOMP_INSTALL ((uint64_t)1<<16)
+#define EXILE_SYSCALL_VOW_SHM ((uint64_t)1<<17)
+#define EXILE_SYSCALL_VOW_STDIO ((uint64_t)1<<18)
+#define EXILE_SYSCALL_VOW_THREAD ((uint64_t)1<<19)
+#define EXILE_SYSCALL_VOW_UNIX ((uint64_t)1<<20)
+#define EXILE_SYSCALL_VOW_WPATH ((uint64_t)1<<21)
 
-#define EXILE_SYSCALL_PLEDGE_DENY_ERROR ((uint64_t)1<<63)
+#define EXILE_SYSCALL_VOW_DENY_ERROR ((uint64_t)1<<63)
 
 
 #define EXILE_ARGFILTERS_COUNT 60
@@ -344,7 +344,7 @@ struct exile_policy
 	char chroot_target_path[PATH_MAX];
 	const char *chdir_path;
 
-	uint64_t pledge_promises;
+	uint64_t vow_promises;
 
 	/* Do not manually add policies here, use exile_append_path_polic*() */
 	struct exile_path_policy *path_policies;
@@ -357,273 +357,273 @@ struct exile_policy
 };
 
 
-static struct syscall_pledge_map exile_pledge_map[] =
+static struct syscall_vow_map exile_vow_map[] =
 {
-	{EXILE_SYS(read), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(write), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(open), EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH},
-	{EXILE_SYS(close), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(stat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(fstat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(lstat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(poll), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(lseek), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mmap), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_PROT_EXEC},
-	{EXILE_SYS(mprotect), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_PROT_EXEC},
-	{EXILE_SYS(munmap), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(brk), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigaction), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigprocmask), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigreturn), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(ioctl), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_IOCTL},
-	{EXILE_SYS(pread64), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(pwrite64), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(readv), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(writev), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(access), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(pipe), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(select), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(sched_yield), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mremap), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(msync), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mincore), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(madvise), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(shmget), EXILE_SYSCALL_PLEDGE_SHM},
-	{EXILE_SYS(shmat), EXILE_SYSCALL_PLEDGE_SHM},
-	{EXILE_SYS(shmctl), EXILE_SYSCALL_PLEDGE_SHM},
-	{EXILE_SYS(dup), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(dup2), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(pause), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(nanosleep), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getitimer), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(alarm), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setitimer), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getpid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(sendfile), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(socket), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(connect), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(accept), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(sendto), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(recvfrom), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(sendmsg), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(recvmsg), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(shutdown), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(bind), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(listen), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(getsockname), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(getpeername), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(socketpair), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setsockopt), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(getsockopt), EXILE_SYSCALL_PLEDGE_INET|EXILE_SYSCALL_PLEDGE_UNIX},
-	{EXILE_SYS(clone), EXILE_SYSCALL_PLEDGE_CLONE|EXILE_SYSCALL_PLEDGE_THREAD},
-	{EXILE_SYS(fork), EXILE_SYSCALL_PLEDGE_CLONE},
-	{EXILE_SYS(vfork), EXILE_SYSCALL_PLEDGE_CLONE},
-	{EXILE_SYS(execve), EXILE_SYSCALL_PLEDGE_EXEC},
-	{EXILE_SYS(exit), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(wait4), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(kill), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(uname), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(semget), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(semop), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(semctl), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(shmdt), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(msgget), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(msgsnd), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(msgrcv), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(msgctl), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(fcntl), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(flock), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(fsync), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(fdatasync), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(truncate), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(ftruncate), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getdents), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(getcwd), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(chdir), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(fchdir), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(rename), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(mkdir), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(rmdir), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(creat), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(link), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(unlink), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(symlink), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(readlink), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(chmod), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(fchmod), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(chown), EXILE_SYSCALL_PLEDGE_CHOWN},
-	{EXILE_SYS(fchown), EXILE_SYSCALL_PLEDGE_CHOWN},
-	{EXILE_SYS(lchown), EXILE_SYSCALL_PLEDGE_CHOWN},
-	{EXILE_SYS(umask), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(gettimeofday), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getrlimit), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getrusage), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(sysinfo), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(times), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getuid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getgid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setuid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(setgid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(geteuid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getegid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setpgid), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(getppid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getpgrp), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setsid), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(setreuid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(setregid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(getgroups), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setgroups), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(setresuid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(getresuid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setresgid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(getresgid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getpgid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setfsuid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(setfsgid), EXILE_SYSCALL_PLEDGE_ID},
-	{EXILE_SYS(getsid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(capget), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigpending), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigtimedwait), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigqueueinfo), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(rt_sigsuspend), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(utime), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(mknod), EXILE_SYSCALL_PLEDGE_DPATH},
-	{EXILE_SYS(uselib), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(ustat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(statfs), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(fstatfs), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(getpriority), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(setpriority), EXILE_SYSCALL_PLEDGE_SCHED|EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(sched_setparam), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_getparam), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_setscheduler), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_getscheduler), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_get_priority_max), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_get_priority_min), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_rr_get_interval), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(mlock), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(munlock), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mlockall), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(munlockall), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(vhangup), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(prctl), EXILE_SYSCALL_PLEDGE_STDIO|EXILE_SYSCALL_PLEDGE_PRCTL|EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL},
-	{EXILE_SYS(setrlimit), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(sync), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(gettid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(readahead), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(setxattr), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(lsetxattr), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(fsetxattr), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(getxattr), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(lgetxattr), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(fgetxattr), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(listxattr), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(llistxattr), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(flistxattr), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(removexattr), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(lremovexattr), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(fremovexattr), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(tkill), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(time), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(futex), EXILE_SYSCALL_PLEDGE_THREAD},
-	{EXILE_SYS(sched_getaffinity), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(set_thread_area), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(get_thread_area), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(lookup_dcookie), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_create), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_ctl_old), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_wait_old), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(remap_file_pages), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getdents64), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(set_tid_address), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(semtimedop), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(fadvise64), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timer_create), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timer_settime), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timer_gettime), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timer_getoverrun), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timer_delete), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(clock_gettime), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(clock_getres), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(clock_nanosleep), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(exit_group), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_wait), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_ctl), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(tgkill), EXILE_SYSCALL_PLEDGE_PROC},
-	{EXILE_SYS(utimes), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(mbind), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(get_mempolicy), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mq_open), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mq_unlink), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mq_timedsend), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mq_timedreceive), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mq_notify), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(mq_getsetattr), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(waitid), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(inotify_init), EXILE_SYSCALL_PLEDGE_FSNOTIFY},
-	{EXILE_SYS(inotify_add_watch), EXILE_SYSCALL_PLEDGE_FSNOTIFY},
-	{EXILE_SYS(inotify_rm_watch), EXILE_SYSCALL_PLEDGE_FSNOTIFY},
-	{EXILE_SYS(openat), EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH},
-	{EXILE_SYS(mkdirat), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(mknodat), EXILE_SYSCALL_PLEDGE_DPATH},
-	{EXILE_SYS(fchownat), EXILE_SYSCALL_PLEDGE_CHOWN},
-	{EXILE_SYS(futimesat), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(newfstatat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(unlinkat), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(renameat), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(linkat), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(symlinkat), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(readlinkat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(fchmodat), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(faccessat), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(pselect6), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(ppoll), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(set_robust_list), EXILE_SYSCALL_PLEDGE_THREAD},
-	{EXILE_SYS(get_robust_list), EXILE_SYSCALL_PLEDGE_THREAD},
-	{EXILE_SYS(splice), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(tee), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(sync_file_range), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(vmsplice), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(move_pages), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(utimensat), EXILE_SYSCALL_PLEDGE_FATTR},
-	{EXILE_SYS(epoll_pwait), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(signalfd), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timerfd_create), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(eventfd), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(fallocate), EXILE_SYSCALL_PLEDGE_WPATH|EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(timerfd_settime), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(timerfd_gettime), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(accept4), EXILE_SYSCALL_PLEDGE_UNIX|EXILE_SYSCALL_PLEDGE_INET},
-	{EXILE_SYS(signalfd4), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(eventfd2), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_create1), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(dup3), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(pipe2), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(inotify_init1), EXILE_SYSCALL_PLEDGE_FSNOTIFY},
-	{EXILE_SYS(preadv), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(pwritev), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(recvmmsg), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(fanotify_init), EXILE_SYSCALL_PLEDGE_FSNOTIFY},
-	{EXILE_SYS(fanotify_mark), EXILE_SYSCALL_PLEDGE_FSNOTIFY},
-	{EXILE_SYS(open_by_handle_at), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(sendmmsg), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(getcpu), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(sched_setattr), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(sched_getattr), EXILE_SYSCALL_PLEDGE_SCHED},
-	{EXILE_SYS(renameat2), EXILE_SYSCALL_PLEDGE_CPATH},
-	{EXILE_SYS(getrandom), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(execveat), EXILE_SYSCALL_PLEDGE_EXEC},
-	{EXILE_SYS(mlock2), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(copy_file_range), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(statx), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(clone3), EXILE_SYSCALL_PLEDGE_CLONE},
-	{EXILE_SYS(close_range), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(openat2), EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH},
-	{EXILE_SYS(faccessat2), EXILE_SYSCALL_PLEDGE_RPATH},
-	{EXILE_SYS(process_madvise), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(epoll_pwait2), EXILE_SYSCALL_PLEDGE_STDIO},
-	{EXILE_SYS(futex_waitv), EXILE_SYSCALL_PLEDGE_THREAD}
+	{EXILE_SYS(read), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(write), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(open), EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH},
+	{EXILE_SYS(close), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(stat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(fstat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(lstat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(poll), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(lseek), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mmap), EXILE_SYSCALL_VOW_STDIO|EXILE_SYSCALL_VOW_PROT_EXEC},
+	{EXILE_SYS(mprotect), EXILE_SYSCALL_VOW_STDIO|EXILE_SYSCALL_VOW_PROT_EXEC},
+	{EXILE_SYS(munmap), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(brk), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigaction), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigprocmask), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigreturn), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(ioctl), EXILE_SYSCALL_VOW_STDIO|EXILE_SYSCALL_VOW_IOCTL},
+	{EXILE_SYS(pread64), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(pwrite64), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(readv), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(writev), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(access), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(pipe), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(select), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(sched_yield), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mremap), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(msync), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mincore), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(madvise), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(shmget), EXILE_SYSCALL_VOW_SHM},
+	{EXILE_SYS(shmat), EXILE_SYSCALL_VOW_SHM},
+	{EXILE_SYS(shmctl), EXILE_SYSCALL_VOW_SHM},
+	{EXILE_SYS(dup), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(dup2), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(pause), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(nanosleep), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getitimer), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(alarm), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setitimer), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getpid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(sendfile), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(socket), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(connect), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(accept), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(sendto), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(recvfrom), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(sendmsg), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(recvmsg), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(shutdown), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(bind), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(listen), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(getsockname), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(getpeername), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(socketpair), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setsockopt), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(getsockopt), EXILE_SYSCALL_VOW_INET|EXILE_SYSCALL_VOW_UNIX},
+	{EXILE_SYS(clone), EXILE_SYSCALL_VOW_CLONE|EXILE_SYSCALL_VOW_THREAD},
+	{EXILE_SYS(fork), EXILE_SYSCALL_VOW_CLONE},
+	{EXILE_SYS(vfork), EXILE_SYSCALL_VOW_CLONE},
+	{EXILE_SYS(execve), EXILE_SYSCALL_VOW_EXEC},
+	{EXILE_SYS(exit), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(wait4), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(kill), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(uname), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(semget), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(semop), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(semctl), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(shmdt), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(msgget), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(msgsnd), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(msgrcv), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(msgctl), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(fcntl), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(flock), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(fsync), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(fdatasync), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(truncate), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(ftruncate), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getdents), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(getcwd), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(chdir), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(fchdir), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(rename), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(mkdir), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(rmdir), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(creat), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(link), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(unlink), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(symlink), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(readlink), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(chmod), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(fchmod), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(chown), EXILE_SYSCALL_VOW_CHOWN},
+	{EXILE_SYS(fchown), EXILE_SYSCALL_VOW_CHOWN},
+	{EXILE_SYS(lchown), EXILE_SYSCALL_VOW_CHOWN},
+	{EXILE_SYS(umask), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(gettimeofday), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getrlimit), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getrusage), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(sysinfo), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(times), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getuid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getgid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setuid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(setgid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(geteuid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getegid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setpgid), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(getppid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getpgrp), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setsid), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(setreuid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(setregid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(getgroups), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setgroups), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(setresuid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(getresuid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setresgid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(getresgid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getpgid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setfsuid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(setfsgid), EXILE_SYSCALL_VOW_ID},
+	{EXILE_SYS(getsid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(capget), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigpending), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigtimedwait), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigqueueinfo), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(rt_sigsuspend), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(utime), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(mknod), EXILE_SYSCALL_VOW_DPATH},
+	{EXILE_SYS(uselib), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(ustat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(statfs), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(fstatfs), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(getpriority), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(setpriority), EXILE_SYSCALL_VOW_SCHED|EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(sched_setparam), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_getparam), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_setscheduler), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_getscheduler), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_get_priority_max), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_get_priority_min), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_rr_get_interval), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(mlock), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(munlock), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mlockall), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(munlockall), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(vhangup), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(prctl), EXILE_SYSCALL_VOW_STDIO|EXILE_SYSCALL_VOW_PRCTL|EXILE_SYSCALL_VOW_SECCOMP_INSTALL},
+	{EXILE_SYS(setrlimit), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(sync), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(gettid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(readahead), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(setxattr), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(lsetxattr), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(fsetxattr), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(getxattr), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(lgetxattr), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(fgetxattr), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(listxattr), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(llistxattr), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(flistxattr), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(removexattr), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(lremovexattr), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(fremovexattr), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(tkill), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(time), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(futex), EXILE_SYSCALL_VOW_THREAD},
+	{EXILE_SYS(sched_getaffinity), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(set_thread_area), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(get_thread_area), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(lookup_dcookie), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_create), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_ctl_old), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_wait_old), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(remap_file_pages), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getdents64), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(set_tid_address), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(semtimedop), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(fadvise64), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timer_create), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timer_settime), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timer_gettime), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timer_getoverrun), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timer_delete), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(clock_gettime), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(clock_getres), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(clock_nanosleep), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(exit_group), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_wait), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_ctl), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(tgkill), EXILE_SYSCALL_VOW_PROC},
+	{EXILE_SYS(utimes), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(mbind), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(get_mempolicy), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mq_open), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mq_unlink), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mq_timedsend), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mq_timedreceive), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mq_notify), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(mq_getsetattr), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(waitid), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(inotify_init), EXILE_SYSCALL_VOW_FSNOTIFY},
+	{EXILE_SYS(inotify_add_watch), EXILE_SYSCALL_VOW_FSNOTIFY},
+	{EXILE_SYS(inotify_rm_watch), EXILE_SYSCALL_VOW_FSNOTIFY},
+	{EXILE_SYS(openat), EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH},
+	{EXILE_SYS(mkdirat), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(mknodat), EXILE_SYSCALL_VOW_DPATH},
+	{EXILE_SYS(fchownat), EXILE_SYSCALL_VOW_CHOWN},
+	{EXILE_SYS(futimesat), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(newfstatat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(unlinkat), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(renameat), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(linkat), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(symlinkat), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(readlinkat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(fchmodat), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(faccessat), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(pselect6), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(ppoll), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(set_robust_list), EXILE_SYSCALL_VOW_THREAD},
+	{EXILE_SYS(get_robust_list), EXILE_SYSCALL_VOW_THREAD},
+	{EXILE_SYS(splice), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(tee), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(sync_file_range), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(vmsplice), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(move_pages), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(utimensat), EXILE_SYSCALL_VOW_FATTR},
+	{EXILE_SYS(epoll_pwait), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(signalfd), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timerfd_create), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(eventfd), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(fallocate), EXILE_SYSCALL_VOW_WPATH|EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(timerfd_settime), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(timerfd_gettime), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(accept4), EXILE_SYSCALL_VOW_UNIX|EXILE_SYSCALL_VOW_INET},
+	{EXILE_SYS(signalfd4), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(eventfd2), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_create1), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(dup3), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(pipe2), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(inotify_init1), EXILE_SYSCALL_VOW_FSNOTIFY},
+	{EXILE_SYS(preadv), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(pwritev), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(recvmmsg), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(fanotify_init), EXILE_SYSCALL_VOW_FSNOTIFY},
+	{EXILE_SYS(fanotify_mark), EXILE_SYSCALL_VOW_FSNOTIFY},
+	{EXILE_SYS(open_by_handle_at), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(sendmmsg), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(getcpu), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(sched_setattr), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(sched_getattr), EXILE_SYSCALL_VOW_SCHED},
+	{EXILE_SYS(renameat2), EXILE_SYSCALL_VOW_CPATH},
+	{EXILE_SYS(getrandom), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(execveat), EXILE_SYSCALL_VOW_EXEC},
+	{EXILE_SYS(mlock2), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(copy_file_range), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(statx), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(clone3), EXILE_SYSCALL_VOW_CLONE},
+	{EXILE_SYS(close_range), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(openat2), EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH},
+	{EXILE_SYS(faccessat2), EXILE_SYSCALL_VOW_RPATH},
+	{EXILE_SYS(process_madvise), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(epoll_pwait2), EXILE_SYSCALL_VOW_STDIO},
+	{EXILE_SYS(futex_waitv), EXILE_SYSCALL_VOW_THREAD}
 };
 
 
@@ -679,16 +679,16 @@ int exile_append_syscall_default_policy(struct exile_policy *exile_policy, unsig
 	return exile_append_syscall_policy(exile_policy, EXILE_SYSCALL_MATCH_ALL, default_policy, NULL, 0);
 }
 
-/* Returns, for the specific syscall, the correct sock_filter struct for the provided pledge_promises
+/* Returns, for the specific syscall, the correct sock_filter struct for the provided vow_promises
 
 	Returns: 0 if none copied, otherwise the number of entries in "filter".
  */
 
-static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct sock_filter *filter , int *policy)
+static int get_vow_argfilter(long syscall, uint64_t vow_promises, struct sock_filter *filter , int *policy)
 {
 
 	/* How to read this:
-	 * Keep in mind our default action is do deny, unless it's a syscall from an pledge promise. Then it will be
+	 * Keep in mind our default action is do deny, unless it's a syscall from an vow promise. Then it will be
 	 * accepted if the argument values are good (if we care about them at all).
 	 * EXILE_BPF_MATCH() means the argument value is good, and the syscall can be accepted
 	 * EXILE_BPF_NO_MATCH() means the syscall won't be allowed because the value is illegal
@@ -760,25 +760,25 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 	{
 		case EXILE_SYS(mmap):
 		case EXILE_SYS(mprotect):
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_PROT_EXEC)
+			if(vow_promises & EXILE_SYSCALL_VOW_PROT_EXEC)
 			{
 				/* If prot exec is allowed, there is no need to filter anything here */
 				result = 0;
 				break;
 			}
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_STDIO)
+			if(vow_promises & EXILE_SYSCALL_VOW_STDIO)
 			{
 				result = sizeof(mmap_no_exec)/sizeof(mmap_no_exec[0]);
 				memcpy(filter, mmap_no_exec, sizeof(mmap_no_exec));
 			}
 			break;
 		case EXILE_SYS(ioctl):
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_IOCTL)
+			if(vow_promises & EXILE_SYSCALL_VOW_IOCTL)
 			{
 				result = 0;
 				break;
 			}
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_STDIO)
+			if(vow_promises & EXILE_SYSCALL_VOW_STDIO)
 			{
 				result = sizeof(ioctl_default)/sizeof(ioctl_default[0]);
 				memcpy(filter, ioctl_default, sizeof(ioctl_default));
@@ -795,17 +795,17 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 				open_rdonly[0].k = offsetof(struct seccomp_data, args[2]);
 			}
 			/* The combination of those three implies no filtering of open args */
-			if((pledge_promises & (EXILE_SYSCALL_PLEDGE_CPATH|EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH)) == (EXILE_SYSCALL_PLEDGE_CPATH|EXILE_SYSCALL_PLEDGE_RPATH|EXILE_SYSCALL_PLEDGE_WPATH))
+			if((vow_promises & (EXILE_SYSCALL_VOW_CPATH|EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH)) == (EXILE_SYSCALL_VOW_CPATH|EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH))
 			{
 				result = 0;
 				break;
 			}
 			/* If cpath is legal, don't filter O_CREAT */
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_CPATH)
+			if(vow_promises & EXILE_SYSCALL_VOW_CPATH)
 			{
 				open_rdonly[1] = (struct sock_filter) EXILE_BPF_NOP;
 			}
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_WPATH)
+			if(vow_promises & EXILE_SYSCALL_VOW_WPATH)
 			{
 				open_rdonly[2] = (struct sock_filter) EXILE_BPF_NOP;
 				open_rdonly[3] = (struct sock_filter) EXILE_BPF_NOP;
@@ -820,12 +820,12 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			*policy = EXILE_SYSCALL_DENY_RET_ERROR;
 			break;
 		case EXILE_SYS(socket):
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_UNIX)
+			if(vow_promises & EXILE_SYSCALL_VOW_UNIX)
 			{
 				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_UNIX);
 				++current_filter_index;
 			}
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_INET)
+			if(vow_promises & EXILE_SYSCALL_VOW_INET)
 			{
 				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_INET);
 				++current_filter_index;
@@ -841,7 +841,7 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			memcpy(filter, setsockopt_filter, sizeof(setsockopt_filter));
 			break;
 		case EXILE_SYS(clone):
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_CLONE)
+			if(vow_promises & EXILE_SYSCALL_VOW_CLONE)
 			{
 				result = 0;
 				break;
@@ -850,19 +850,19 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 			memcpy(filter, clone_filter, sizeof(clone_filter));
 			break;
 		case EXILE_SYS(clone3):
-			if((pledge_promises & EXILE_SYSCALL_PLEDGE_CLONE) == 0)
+			if((vow_promises & EXILE_SYSCALL_VOW_CLONE) == 0)
 			{
 				result = 0;
 				*policy = EXILE_SYSCALL_DENY_RET_ERROR;
 			}
 			break;
 		case EXILE_SYS(prctl):
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_PRCTL)
+			if(vow_promises & EXILE_SYSCALL_VOW_PRCTL)
 			{
 				result = 0;
 				break;
 			}
-			if(pledge_promises & EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL)
+			if(vow_promises & EXILE_SYSCALL_VOW_SECCOMP_INSTALL)
 			{
 				prctl_default[3] = (struct sock_filter) EXILE_BPF_MATCH(PR_SET_SECCOMP);
 			}
@@ -873,28 +873,28 @@ static int get_pledge_argfilter(long syscall, uint64_t pledge_promises, struct s
 	return result;
 }
 
-int exile_append_pledge_promises(struct exile_policy *policy, uint64_t pledge_promises)
+int exile_append_vow_promises(struct exile_policy *policy, uint64_t vow_promises)
 {
-	for(unsigned int i = 0; i < sizeof(exile_pledge_map)/sizeof(exile_pledge_map[0]); i++)
+	for(unsigned int i = 0; i < sizeof(exile_vow_map)/sizeof(exile_vow_map[0]); i++)
 	{
-		struct syscall_pledge_map *current_map = &exile_pledge_map[i];
-		if(current_map->pledgemask & pledge_promises)
+		struct syscall_vow_map *current_map = &exile_vow_map[i];
+		if(current_map->vowmask & vow_promises)
 		{
 			struct sock_filter filter[EXILE_ARGFILTERS_COUNT];
 			long syscall = current_map->syscall;
 			int syscall_policy = EXILE_SYSCALL_ALLOW;
-			int argfilters = get_pledge_argfilter(syscall, pledge_promises, filter, &syscall_policy);
+			int argfilters = get_vow_argfilter(syscall, vow_promises, filter, &syscall_policy);
 			int ret = exile_append_syscall_policy(policy, syscall, syscall_policy, filter, argfilters);
 			if(ret != 0)
 			{
-				EXILE_LOG_ERROR("Failed adding syscall policy from pledge while processing %li\n", syscall);
+				EXILE_LOG_ERROR("Failed adding syscall policy from vow while processing %li\n", syscall);
 				return ret;
 			}
 
 		}
 	}
-	int pledge_policy = (pledge_promises & EXILE_SYSCALL_PLEDGE_DENY_ERROR) ? EXILE_SYSCALL_DENY_RET_ERROR : EXILE_SYSCALL_DENY_KILL_PROCESS;
-	return exile_append_syscall_default_policy(policy, pledge_policy);
+	int vow_policy = (vow_promises & EXILE_SYSCALL_VOW_DENY_ERROR) ? EXILE_SYSCALL_DENY_RET_ERROR : EXILE_SYSCALL_DENY_KILL_PROCESS;
+	return exile_append_syscall_default_policy(policy, vow_policy);
 }
 
 /* Creates an empty policy struct without opinionated defaults.
@@ -1829,12 +1829,12 @@ int exile_enable_policy(struct exile_policy *policy)
 	close(landlock_ruleset_fd);
 #endif
 
-	if(policy->pledge_promises != 0)
+	if(policy->vow_promises != 0)
 	{
-		int ret = exile_append_pledge_promises(policy, policy->pledge_promises);
+		int ret = exile_append_vow_promises(policy, policy->vow_promises);
 		if(ret != 0)
 		{
-			EXILE_LOG_ERROR("exile_append_pledge_promises() failed: %i\n", ret);
+			EXILE_LOG_ERROR("exile_append_vow_promises() failed: %i\n", ret);
 			return ret;
 		}
 	}
@@ -1850,26 +1850,26 @@ int exile_enable_policy(struct exile_policy *policy)
 #endif
 
 
-/* Convenience wrapper for the pledge-related subset of exile.h
+/* Convenience wrapper for the vow-related subset of exile.h
  *
- * Only installs seccomp filters for the specified pledge promises.
+ * Only installs seccomp filters for the specified vow promises.
  *
- * Useful if only pledge is required from exile.h, but nothing else
+ * Useful if only vow is required from exile.h, but nothing else
  *
- * As with OpenBSD's, subsequent calls can only reduce allowed syscalls.
+ * Comparable with OpenBSD's pledge(), subsequent calls can only reduce allowed syscalls.
  *
  * Here, adding more promises than a previous call set may return success, but
  * won't be allowed during execution.
  *
- * Due to the nature of seccomp, it's furthermore required the EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL promise
+ * Due to the nature of seccomp, it's furthermore required the EXILE_SYSCALL_VOW_SECCOMP_INSTALL promise
  * is set if further calls are expected. Generally, it's reasonable for the last call to
- * exile_pledge() a program makes to not set EXILE_SYSCALL_PLEDGE_SECCOMP_INSTALL.
+ * exile_vow() a program makes to not set EXILE_SYSCALL_VOW_SECCOMP_INSTALL.
  *
  * There are no seperate exec_promises. All children of the process inherit the filter.
  * .
  * Return value: 0 on success, any other value on failure.
  */
-int exile_pledge(uint64_t promises)
+int exile_vow(uint64_t promises)
 {
 	struct __user_cap_header_struct h = { 0 };
 	h.pid = 0;
@@ -1894,7 +1894,7 @@ int exile_pledge(uint64_t promises)
 		return 1;
 	}
 
-	policy->pledge_promises = promises;
+	policy->vow_promises = promises;
 	if((cap[0].effective & (1<<CAP_SYS_ADMIN)) == 0)
 	{
 		policy->no_new_privs = 1;
