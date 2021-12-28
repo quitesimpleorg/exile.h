@@ -1329,31 +1329,32 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 			for(size_t i = 0; i < syscallpolicy->argfilterscount; i++)
 			{
 				filter[*start_index] = syscallpolicy->argfilters[i];
+				struct sock_filter *current = &filter[*start_index];
 				__u8 jump_count_next_syscall = next_syscall_pc;
 				__u8 jump_count_return = jump_count_next_syscall - 1;
-				if(filter[*start_index].jt == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+				if(current->jt == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
 				{
-					filter[*start_index].jt = jump_count_next_syscall;
+					current->jt = jump_count_next_syscall;
 				}
-				if(filter[*start_index].jt == EXILE_SYSCALL_EXIT_BPF_RETURN)
+				if(current->jt == EXILE_SYSCALL_EXIT_BPF_RETURN)
 				{
-					filter[*start_index].jt = jump_count_return;
+					current->jt = jump_count_return;
 				}
-				if(filter[*start_index].jf == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
+				if(current->jf == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
 				{
-					filter[*start_index].jf = jump_count_next_syscall;
+					current->jf = jump_count_next_syscall;
 				}
-				if(filter[*start_index].jf == EXILE_SYSCALL_EXIT_BPF_RETURN)
+				if(current->jf == EXILE_SYSCALL_EXIT_BPF_RETURN)
 				{
-					filter[*start_index].jf = jump_count_return;
+					current->jf = jump_count_return;
 				}
-				if(filter[*start_index].code == return_matching.code && filter[*start_index].k == return_matching.k)
+				if(current->code == return_matching.code && current->k == return_matching.k)
 				{
-					filter[*start_index].k = jump_count_return;
+					current->k = jump_count_return;
 				}
-				if(filter[*start_index].code == return_not_matching.code && filter[*start_index].k == return_not_matching.k)
+				if(current->code == return_not_matching.code && current->k == return_not_matching.k)
 				{
-					filter[*start_index].k = jump_count_next_syscall;
+					current->k = jump_count_next_syscall;
 				}
 				--next_syscall_pc;
 				++*start_index;
