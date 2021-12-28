@@ -1546,18 +1546,18 @@ static int check_policy_sanity(struct exile_policy *policy)
 	}
 
 	int can_use_landlock = exile_landlock_is_available();
-	struct exile_path_policy *path_policy = policy->path_policies;
-	while(path_policy)
+	if(!can_use_landlock)
 	{
-		if(path_policy_needs_landlock(path_policy))
+		struct exile_path_policy *path_policy = policy->path_policies;
+		while(path_policy)
 		{
-			if(!can_use_landlock)
+			if(path_policy_needs_landlock(path_policy))
 			{
 				EXILE_LOG_ERROR("Error: A path policy needs landlock, but landlock is not available. Fallback not possible\n");
 				return -1;
 			}
+			path_policy = path_policy->next;
 		}
-		path_policy = path_policy->next;
 	}
 
 	/* TODO: check if we have ALLOWED, but no default deny */
