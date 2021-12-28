@@ -266,6 +266,16 @@ struct exile_path_policy
 #define EXILE_BPF_NOP \
 BPF_STMT(BPF_JMP+BPF_JA,0)
 
+/* A few more dirty markers to simplify array block initializers. We replace those
+in append_syscall_to_bpf(). The k value is meaningless here and we don't expect
+to ever have filter code actually wanting to jump that many steps forward. So
+they serve as an special value we will replace with actual ones. */
+#define EXILE_BPF_RETURN_MATCHING \
+BPF_STMT(BPF_JMP+BPF_JA,1234)
+
+#define EXILE_BPF_RETURN_NOT_MATCHING \
+BPF_STMT(BPF_JMP+BPF_JA,5678)
+
 #define EXILE_BPF_LOAD_SECCOMP_ARG(nr) \
 BPF_STMT(BPF_LD+BPF_W+BPF_ABS, (offsetof(struct seccomp_data, args[nr])))
 
@@ -679,198 +689,176 @@ int exile_append_syscall_default_policy(struct exile_policy *exile_policy, unsig
 	return exile_append_syscall_policy(exile_policy, EXILE_SYSCALL_MATCH_ALL, default_policy, NULL, 0);
 }
 
+
+struct exile_syscall_filter
+{
+	uint64_t vowmask; /* Apply filter if this mask is set. 0 = ignore mask, apply always */
+	struct sock_filter filter;
+	int whenset; /* 1 = Filter should be added if vowmask is contained in pledge mask, otherwise won't be added. */
+};
+
+#define COUNT_EXILE_SYSCALL_FILTER(f) \
+	sizeof(f)/sizeof(f[0])
+
+#define EXILE_SYSCALL_FILTER_LOAD_ARG(val) \
+{ 0, EXILE_BPF_LOAD_SECCOMP_ARG(val), 0}
+
 /* Returns, for the specific syscall, the correct sock_filter struct for the provided vow_promises
-
-	Returns: 0 if none copied, otherwise the number of entries in "filter".
+ *
+ *	Returns: 0 if none copied, otherwise the number of entries in "filter".
  */
-
 static int get_vow_argfilter(long syscall, uint64_t vow_promises, struct sock_filter *filter , int *policy)
 {
 
 	/* How to read this:
-	 * Keep in mind our default action is do deny, unless it's a syscall from an vow promise. Then it will be
+	 * Keep in mind our default action is to deny, unless it's a syscall from a vow promise. Then it will be
 	 * accepted if the argument values are good (if we care about them at all).
-	 * EXILE_BPF_MATCH() means the argument value is good, and the syscall can be accepted
+	 * EXILE_BPF_MATCH() means the argument value is good, and the syscall can be accepted without further checks
 	 * EXILE_BPF_NO_MATCH() means the syscall won't be allowed because the value is illegal
+	 *
+	 * First field (vowmask): The mask to check
+	 * Last field (whenset): If mask is set in vow_promises, then add this filter, otherwise don't.
 	 */
-	struct sock_filter mmap_no_exec[] = {
-		EXILE_BPF_LOAD_SECCOMP_ARG(2),
-		EXILE_BPF_NO_MATCH(PROT_EXEC)
-	};
 
-	struct sock_filter ioctl_default[] = {
-			EXILE_BPF_LOAD_SECCOMP_ARG(1),
-			EXILE_BPF_MATCH(FIONREAD),
-			EXILE_BPF_MATCH(FIONBIO),
-			EXILE_BPF_MATCH(FIOCLEX),
-			EXILE_BPF_CMP_EQ(FIONCLEX, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
-	};
-
-	/* open() and friends with read-only flags */
-	struct sock_filter open_rdonly[] = {
-		EXILE_BPF_LOAD_SECCOMP_ARG(1),
-		EXILE_BPF_NO_MATCH_SET(O_CREAT),
-		EXILE_BPF_NO_MATCH_SET(O_TMPFILE),
-		EXILE_BPF_NO_MATCH_SET(O_WRONLY),
-		EXILE_BPF_NO_MATCH_SET(O_RDWR),
-		EXILE_BPF_NO_MATCH_SET(O_APPEND),
-	};
-
-	struct sock_filter socket_filter[4] = {
-		EXILE_BPF_LOAD_SECCOMP_ARG(0),
-		EXILE_BPF_NOP,
-		EXILE_BPF_NOP,
-		EXILE_BPF_NOP
-	};
-
-	struct sock_filter setsockopt_filter[] = {
-		EXILE_BPF_LOAD_SECCOMP_ARG(2),
-		EXILE_BPF_NO_MATCH(SO_DEBUG),
-		EXILE_BPF_NO_MATCH(SO_SNDBUFFORCE)
+	struct exile_syscall_filter mmap_filter[] = {
+		EXILE_SYSCALL_FILTER_LOAD_ARG(2),
+		{ EXILE_SYSCALL_VOW_PROT_EXEC, EXILE_BPF_NO_MATCH_SET(PROT_EXEC), 0},
 	};
 
 
-	struct sock_filter clone_filter[] = {
-		/* It's the first argument for x86_64 */
-		EXILE_BPF_LOAD_SECCOMP_ARG(0),
-		EXILE_BPF_CMP_SET(CLONE_VM, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
-		EXILE_BPF_CMP_SET(CLONE_THREAD, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWCGROUP),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWIPC),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWNET),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWNS),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWPID),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWUSER),
-		EXILE_BPF_NO_MATCH_SET(CLONE_NEWUTS),
+	struct exile_syscall_filter ioctl_filter[] = {
+		EXILE_SYSCALL_FILTER_LOAD_ARG(1),
+		{ EXILE_SYSCALL_VOW_IOCTL, EXILE_BPF_RETURN_MATCHING, 1 },
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIONREAD), 1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIONBIO), 1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIONREAD), 1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIOCLEX), 1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIONCLEX), 1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_RETURN_NOT_MATCHING, 1}
 	};
 
-	struct sock_filter prctl_default[] ={
-		EXILE_BPF_LOAD_SECCOMP_ARG(0),
-		EXILE_BPF_MATCH(PR_SET_NO_NEW_PRIVS),
-		EXILE_BPF_MATCH(PR_GET_NO_NEW_PRIVS),
-		EXILE_BPF_MATCH(PR_GET_NAME),
-		EXILE_BPF_MATCH(PR_SET_NAME),
-		EXILE_BPF_CMP_EQ(PR_CAPBSET_READ, EXILE_SYSCALL_EXIT_BPF_RETURN, EXILE_SYSCALL_EXIT_BPF_NO_MATCH),
+	struct exile_syscall_filter open_filter[] = {
+		EXILE_SYSCALL_FILTER_LOAD_ARG(1),
+		{ EXILE_SYSCALL_VOW_CPATH, EXILE_BPF_NO_MATCH_SET(O_CREAT), 0 },
+		{ EXILE_SYSCALL_VOW_WPATH, EXILE_BPF_NO_MATCH_SET(O_TMPFILE),0 },
+		{ EXILE_SYSCALL_VOW_WPATH, EXILE_BPF_NO_MATCH_SET(O_WRONLY),0 },
+		{ EXILE_SYSCALL_VOW_WPATH, EXILE_BPF_NO_MATCH_SET(O_RDWR),0 },
+		{ EXILE_SYSCALL_VOW_WPATH, EXILE_BPF_NO_MATCH_SET(O_APPEND),0 },
 	};
+
+	struct exile_syscall_filter socket_filter[] = {
+		EXILE_SYSCALL_FILTER_LOAD_ARG(0),
+		{ EXILE_SYSCALL_VOW_UNIX, EXILE_BPF_MATCH(AF_UNIX), 1 },
+		{ EXILE_SYSCALL_VOW_INET, EXILE_BPF_MATCH(AF_INET), 1 },
+		{ EXILE_SYSCALL_VOW_INET, EXILE_BPF_MATCH(AF_INET6), 1 },
+		{ 0, EXILE_BPF_RETURN_NOT_MATCHING, 0}
+	};
+
+	struct exile_syscall_filter setsockopt_filter[] = {
+		EXILE_SYSCALL_FILTER_LOAD_ARG(2),
+		{ 0, EXILE_BPF_NO_MATCH(SO_DEBUG), 0 },
+		{ 0, EXILE_BPF_NO_MATCH(SO_SNDBUFFORCE), 0 }
+	};
+
+
+	struct exile_syscall_filter clone_filter[] = {
+		/* It's the first (0) argument for x86_64 */
+		EXILE_SYSCALL_FILTER_LOAD_ARG(0),
+		{ EXILE_SYSCALL_VOW_CLONE, EXILE_BPF_RETURN_MATCHING, 1 },
+		{ EXILE_SYSCALL_VOW_THREAD, EXILE_BPF_CMP_SET(CLONE_VM, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH), 1},
+		{ EXILE_SYSCALL_VOW_THREAD, EXILE_BPF_CMP_SET(CLONE_THREAD, 0, EXILE_SYSCALL_EXIT_BPF_NO_MATCH), 1},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWCGROUP), 0},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWIPC),0},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWNET),0},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWNS),0},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWPID),0},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWUSER),0},
+		{ 0, EXILE_BPF_NO_MATCH_SET(CLONE_NEWUTS),0},
+	};
+
+
+	struct exile_syscall_filter prctl_filter[] ={
+		EXILE_SYSCALL_FILTER_LOAD_ARG(0),
+		{ EXILE_SYSCALL_VOW_PRCTL, EXILE_BPF_RETURN_MATCHING, 1},
+		{ EXILE_SYSCALL_VOW_SECCOMP_INSTALL, EXILE_BPF_MATCH(PR_SET_SECCOMP), 1 },
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(PR_SET_NO_NEW_PRIVS),1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(PR_GET_NO_NEW_PRIVS),1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(PR_GET_NAME),1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(PR_SET_NAME),1},
+		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(PR_CAPBSET_READ), 1},
+		{ 0, EXILE_BPF_RETURN_NOT_MATCHING, 0}
+	};
+
+	struct exile_syscall_filter *current_filter = NULL;
+	size_t current_count = 0;
 
 	*policy = EXILE_SYSCALL_ALLOW;
-	int result = 0;
-	int current_filter_index = 1;
 	switch(syscall)
 	{
 		case EXILE_SYS(mmap):
 		case EXILE_SYS(mprotect):
-			if(vow_promises & EXILE_SYSCALL_VOW_PROT_EXEC)
-			{
-				/* If prot exec is allowed, there is no need to filter anything here */
-				result = 0;
-				break;
-			}
-			if(vow_promises & EXILE_SYSCALL_VOW_STDIO)
-			{
-				result = sizeof(mmap_no_exec)/sizeof(mmap_no_exec[0]);
-				memcpy(filter, mmap_no_exec, sizeof(mmap_no_exec));
-			}
+			current_filter = mmap_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(mmap_filter);
 			break;
 		case EXILE_SYS(ioctl):
-			if(vow_promises & EXILE_SYSCALL_VOW_IOCTL)
-			{
-				result = 0;
-				break;
-			}
-			if(vow_promises & EXILE_SYSCALL_VOW_STDIO)
-			{
-				result = sizeof(ioctl_default)/sizeof(ioctl_default[0]);
-				memcpy(filter, ioctl_default, sizeof(ioctl_default));
-			}
+			current_filter = ioctl_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(ioctl_filter);
 			break;
 		case EXILE_SYS(open):
 		case EXILE_SYS(openat):
 		case EXILE_SYS(open_by_handle_at):
-			/* TODO: This is still a mess with all those combinations.
-			 We should think of something better */
 			if(syscall == EXILE_SYS(openat) || syscall ==  EXILE_SYS(open_by_handle_at))
 			{
 				/* for openat, it's the third arg */
-				open_rdonly[0].k = offsetof(struct seccomp_data, args[2]);
+				open_filter[0] = (struct exile_syscall_filter) EXILE_SYSCALL_FILTER_LOAD_ARG(2);
 			}
-			/* The combination of those three implies no filtering of open args */
-			if((vow_promises & (EXILE_SYSCALL_VOW_CPATH|EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH)) == (EXILE_SYSCALL_VOW_CPATH|EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH))
-			{
-				result = 0;
-				break;
-			}
-			/* If cpath is legal, don't filter O_CREAT */
-			if(vow_promises & EXILE_SYSCALL_VOW_CPATH)
-			{
-				open_rdonly[1] = (struct sock_filter) EXILE_BPF_NOP;
-			}
-			if(vow_promises & EXILE_SYSCALL_VOW_WPATH)
-			{
-				open_rdonly[2] = (struct sock_filter) EXILE_BPF_NOP;
-				open_rdonly[3] = (struct sock_filter) EXILE_BPF_NOP;
-				open_rdonly[4] = (struct sock_filter) EXILE_BPF_NOP;
-				open_rdonly[5] = (struct sock_filter) EXILE_BPF_NOP;
-			}
-			result = sizeof(open_rdonly)/sizeof(open_rdonly[0]);
-			memcpy(filter, open_rdonly, sizeof(open_rdonly));
+			current_filter = open_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(open_filter);
 			break;
 		case EXILE_SYS(openat2):
-			result = 0;
 			*policy = EXILE_SYSCALL_DENY_RET_ERROR;
+			return 0;
 			break;
 		case EXILE_SYS(socket):
-			if(vow_promises & EXILE_SYSCALL_VOW_UNIX)
-			{
-				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_UNIX);
-				++current_filter_index;
-			}
-			if(vow_promises & EXILE_SYSCALL_VOW_INET)
-			{
-				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_INET);
-				++current_filter_index;
-				socket_filter[current_filter_index] = (struct sock_filter) EXILE_BPF_MATCH(AF_INET6);
-				++current_filter_index;
-			}
-			socket_filter[current_filter_index-1].jf = EXILE_SYSCALL_EXIT_BPF_NO_MATCH;
-			result = current_filter_index;
-			memcpy(filter, socket_filter, result * sizeof(struct sock_filter));
+			current_filter = socket_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(socket_filter);
 			break;
 		case EXILE_SYS(setsockopt):
-			result = sizeof(setsockopt_filter)/sizeof(setsockopt_filter[0]);
-			memcpy(filter, setsockopt_filter, sizeof(setsockopt_filter));
+			current_filter = setsockopt_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(setsockopt_filter);
 			break;
 		case EXILE_SYS(clone):
-			if(vow_promises & EXILE_SYSCALL_VOW_CLONE)
-			{
-				result = 0;
-				break;
-			}
-			result = sizeof(clone_filter)/sizeof(clone_filter[0]);
-			memcpy(filter, clone_filter, sizeof(clone_filter));
+			current_filter = clone_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(clone_filter);
 			break;
 		case EXILE_SYS(clone3):
 			if((vow_promises & EXILE_SYSCALL_VOW_CLONE) == 0)
 			{
-				result = 0;
 				*policy = EXILE_SYSCALL_DENY_RET_ERROR;
+				return 0;
 			}
 			break;
 		case EXILE_SYS(prctl):
-			if(vow_promises & EXILE_SYSCALL_VOW_PRCTL)
-			{
-				result = 0;
-				break;
-			}
-			if(vow_promises & EXILE_SYSCALL_VOW_SECCOMP_INSTALL)
-			{
-				prctl_default[3] = (struct sock_filter) EXILE_BPF_MATCH(PR_SET_SECCOMP);
-			}
-			result = sizeof(prctl_default)/sizeof(prctl_default[0]);
-			memcpy(filter, prctl_default, sizeof(prctl_default));
+			current_filter = prctl_filter;
+			current_count = COUNT_EXILE_SYSCALL_FILTER(prctl_filter);
 			break;
 	}
-	return result;
+
+	int out_filter_index = 0;
+	for(size_t i = 0; i < current_count; i++)
+	{
+		struct exile_syscall_filter *c = &current_filter[i];
+		int set = 0;
+		if(c->vowmask & vow_promises)
+		{
+			set = 1;
+		}
+		if(c->whenset == set || c->vowmask == 0)
+		{
+			filter[out_filter_index++] = c->filter;
+		}
+	}
+	return out_filter_index;
 }
 
 int exile_append_vow_promises(struct exile_policy *policy, uint64_t vow_promises)
@@ -890,7 +878,6 @@ int exile_append_vow_promises(struct exile_policy *policy, uint64_t vow_promises
 				EXILE_LOG_ERROR("Failed adding syscall policy from vow while processing %li\n", syscall);
 				return ret;
 			}
-
 		}
 	}
 	int vow_policy = (vow_promises & EXILE_SYSCALL_VOW_DENY_ERROR) ? EXILE_SYSCALL_DENY_RET_ERROR : EXILE_SYSCALL_DENY_KILL_PROCESS;
@@ -1336,6 +1323,9 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 			filter[(*start_index)++] = syscall_check;
 			--next_syscall_pc;
 
+			struct sock_filter return_matching = EXILE_BPF_RETURN_MATCHING;
+			struct sock_filter return_not_matching = EXILE_BPF_RETURN_NOT_MATCHING;
+
 			for(size_t i = 0; i < syscallpolicy->argfilterscount; i++)
 			{
 				filter[*start_index] = syscallpolicy->argfilters[i];
@@ -1356,6 +1346,14 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 				if(filter[*start_index].jf == EXILE_SYSCALL_EXIT_BPF_RETURN)
 				{
 					filter[*start_index].jf = jump_count_return;
+				}
+				if(filter[*start_index].code == return_matching.code && filter[*start_index].k == return_matching.k)
+				{
+					filter[*start_index].k = jump_count_return;
+				}
+				if(filter[*start_index].code == return_not_matching.code && filter[*start_index].k == return_not_matching.k)
+				{
+					filter[*start_index].k = jump_count_next_syscall;
 				}
 				--next_syscall_pc;
 				++*start_index;
