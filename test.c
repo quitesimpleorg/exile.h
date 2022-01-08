@@ -487,6 +487,50 @@ int test_no_new_fds()
 
 }
 
+int test_mkpath()
+{
+	const char *filepath = "/tmp/.exile.h/test_mkpath/some/sub/dir/file";
+	const char *dirpath =  "/tmp/.exile.h/test_mkpath/some/other/sub/dir";
+	int ret = mkpath(filepath,  0700, 1);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Failed: mkpath(file) returned: %i\n", ret);
+		return 1;
+	}
+	ret = mkpath(dirpath, 0700, 0);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Failed: mkpath(dirpath) returned: %i\n", ret);
+		return 1;
+	}
+
+	struct stat statbuf;
+	ret = stat(filepath, &statbuf);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Failed: stat on filepath returned: %i\n", ret);
+		return 1;
+	}
+	if(!S_ISREG(statbuf.st_mode))
+	{
+		fprintf(stderr, "Failed: mkpath did not create a file: %i\n", ret);
+		return 1;
+	}
+	ret = stat(dirpath, &statbuf);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Failed: stat on dirpath returned: %i\n", ret);
+		return 1;
+	}
+	if(!S_ISDIR(statbuf.st_mode))
+	{
+		fprintf(stderr, "Failed: mkpath did not create a directory: %i\n", ret);
+		return 1;
+	}
+	return 0;
+}
+
+
 struct dispatcher
 {
 	char *name;
@@ -508,7 +552,8 @@ struct dispatcher dispatchers[] = {
 	{ "landlock", &test_landlock},
 	{ "landlock-deny-write", &test_landlock_deny_write },
 	{ "no_fs", &test_nofs},
-	{ "no_new_fds", &test_no_new_fds}
+	{ "no_new_fds", &test_no_new_fds},
+	{ "mkpath", &test_mkpath},
 };
 
 int main(int argc, char *argv[])
