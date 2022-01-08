@@ -328,6 +328,11 @@ is thus up to the default policy  */
 
 
 #define EXILE_ARGFILTERS_COUNT 60
+
+
+#define EXILE_FLAG_ADD_PATH_POLICY_FAIL (1u<<1)
+#define EXILE_FLAG_ADD_SYSCALL_POLICY_FAIL (1u<<2)
+
 struct exile_syscall_policy
 {
 	struct sock_filter argfilters[EXILE_ARGFILTERS_COUNT];
@@ -364,6 +369,7 @@ struct exile_policy
 	struct exile_syscall_policy *syscall_policies;
 	struct exile_syscall_policy **syscall_policies_tail;
 
+	uint32_t exile_flags;
 };
 
 
@@ -662,6 +668,7 @@ int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall,
 	if(newpolicy == NULL)
 	{
 		EXILE_LOG_ERROR("Failed to allocate memory for syscall policy\n");
+		exile_policy->exile_flags |= EXILE_FLAG_ADD_SYSCALL_POLICY_FAIL;
 		return -1;
 	}
 	newpolicy->policy = syscall_policy;
@@ -670,6 +677,7 @@ int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall,
 	if(n > EXILE_ARGFILTERS_COUNT)
 	{
 		EXILE_LOG_ERROR("Too many argfilters supplied\n");
+		exile_policy->exile_flags |= EXILE_FLAG_ADD_SYSCALL_POLICY_FAIL;
 		return -1;
 	}
 	for(size_t i = 0; i < n; i++)
@@ -939,10 +947,19 @@ int exile_append_path_policies(struct exile_policy *exile_policy, unsigned int p
 	path = va_arg(args, char*);
 	while(path != NULL)
 	{
+		int fd = open(path, O_PATH);
+		if(fd == -1)
+		{
+			EXILE_LOG_ERROR("Failed to open the specified path: %s\n", strerror(errno));
+			exile_policy->exile_flags |= EXILE_FLAG_ADD_PATH_POLICY_FAIL;
+			return -1;
+		}
+		close(fd);
 		struct exile_path_policy *newpolicy = (struct exile_path_policy *) calloc(1, sizeof(struct exile_path_policy));
 		if(newpolicy == NULL)
 		{
 			EXILE_LOG_ERROR("Failed to allocate memory for path policy\n");
+			exile_policy->exile_flags |= EXILE_FLAG_ADD_PATH_POLICY_FAIL;
 			return -1;
 		}
 		newpolicy->path = path;
@@ -1763,6 +1780,11 @@ static int enable_no_fs(struct exile_policy *policy)
  */
 int exile_enable_policy(struct exile_policy *policy)
 {
+	if((policy->exile_flags & EXILE_FLAG_ADD_PATH_POLICY_FAIL) || (policy->exile_flags & EXILE_FLAG_ADD_SYSCALL_POLICY_FAIL))
+	{
+		EXILE_LOG_ERROR("Error: At least one syscall or path policy was not successfully added!\n");
+		return -1;
+	}
 	if(check_policy_sanity(policy) != 0)
 	{
 		EXILE_LOG_ERROR("Error: Policy sanity check failed. Cannot apply policy!\n");

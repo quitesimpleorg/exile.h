@@ -530,6 +530,18 @@ int test_mkpath()
 	return 0;
 }
 
+int test_fail_flags()
+{
+	struct exile_policy *policy = exile_init_policy();
+	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/nosuchpathexists");
+	int ret = exile_enable_policy(policy);
+	if(ret == 0)
+	{
+		fprintf(stderr, "Failed: A path that does not exist should have set the error flag %i\n", ret);
+		return 1;
+	}
+	return 0;
+}
 
 struct dispatcher
 {
@@ -554,6 +566,7 @@ struct dispatcher dispatchers[] = {
 	{ "no_fs", &test_nofs},
 	{ "no_new_fds", &test_no_new_fds},
 	{ "mkpath", &test_mkpath},
+	{ "failflags", &test_fail_flags},
 };
 
 int main(int argc, char *argv[])
