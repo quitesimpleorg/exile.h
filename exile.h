@@ -988,28 +988,26 @@ int random_string(char *buffer, size_t buffer_length)
 }
 
 
-/* Creates a directory and all necessary parent directories
- *
- * @returns: 0 on success, -ERRNO on failure
- * */
-static int mkdir_structure(const char *p, mode_t mode)
+/* Creates a directory/file and all necessary parent directories
+* @returns: 0 on success, -ERRNO on failure
+*/
+static int mkpath(const char *p, mode_t mode, int baseisfile)
 {
-	char path[PATH_MAX] = { 0 };
-	int res = snprintf(path, sizeof(path), "%s/", p);
-	if(res < 0)
+	char path[PATH_MAX + 1] = {0};
+	int ret = snprintf(path, sizeof(path), "%s%c", p, (baseisfile) ? '\0' : '/');
+	if(ret < 0)
 	{
-		EXILE_LOG_ERROR("exile: mkdir_strucutre: error during path concatination\n");
+		EXILE_LOG_ERROR("exile: mkdir_structure: error during path concatination\n");
 		return -EINVAL;
 	}
-	if(res >= PATH_MAX)
+	if((size_t)ret >= sizeof(path))
 	{
 		EXILE_LOG_ERROR("exile: mkdir_structure: path concatination truncated\n");
 		return -EINVAL;
 	}
 
-
 	char *begin = path;
-	char *end = begin+1;
+	char *end = begin + 1;
 
 	while(*end)
 	{
@@ -1018,18 +1016,13 @@ static int mkdir_structure(const char *p, mode_t mode)
 			*end = 0;
 			if(mkdir(begin, mode) < 0)
 			{
-				if(errno == EEXIST)
+				if(errno != EEXIST)
 				{
-					//TODO: stat, test if it is a directory, if not, err
-				}
-				else
-				{
-					EXILE_LOG_ERROR("Failed to create directory for chroot: %s\n", begin);
+					EXILE_LOG_ERROR("Failed to create directory: %s\n", begin);
 					return -1;
 				}
 			}
 			*end = '/';
-			++end;
 			while(*end == '/')
 			{
 				++end;
@@ -1039,6 +1032,17 @@ static int mkdir_structure(const char *p, mode_t mode)
 		{
 			++end;
 		}
+	}
+	if(baseisfile)
+	{
+		ret = creat(p, mode);
+		if(ret == -1)
+		{
+			EXILE_LOG_ERROR("Failed to create file: %s\n", begin);
+			return ret;
+		}
+		close(ret);
+		return 0;
 	}
 	return 0;
 }
@@ -1109,7 +1113,21 @@ static int mount_to_chroot(const char *chroot_target_path, struct exile_path_pol
 			EXILE_LOG_ERROR("exile: mount_to_chroot: path concatination truncated\n");
 			return -EINVAL;
 		}
-		int ret = mkdir_structure(path_inside_chroot, 0700);
+		
+		struct stat sb;
+		int ret = stat(path_policy->path, &sb);
+		if(ret < 0)
+		{
+			EXILE_LOG_ERROR("mount_to_chroot(): stat failed\n");
+			return ret;
+		}
+	
+		int baseisfile = 0;
+		if(S_ISREG(sb.st_mode))
+		{
+			baseisfile = 1;
+		}
+		ret = mkpath(path_inside_chroot, 0700, baseisfile);
 		if(ret < 0)
 		{
 			EXILE_LOG_ERROR("Error creating directory structure while mounting paths to chroot. %s\n", strerror(errno));
