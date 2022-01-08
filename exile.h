@@ -1415,67 +1415,27 @@ static int exile_enable_syscall_policy(struct exile_policy *policy)
 }
 
 #if HAVE_LANDLOCK == 1
-static unsigned int exile_flags_to_landlock(unsigned int flags)
+static unsigned int exile_flags_to_landlock(unsigned int flags, int statmode)
 {
 	unsigned int result = 0;
 	if(flags & EXILE_FS_ALLOW_ALL_READ)
 	{
 		result |= LANDLOCK_ACCESS_FS_READ_FILE;
-		result |= LANDLOCK_ACCESS_FS_READ_DIR;
+		if(S_ISDIR(statmode))
+		{
+			result |= LANDLOCK_ACCESS_FS_READ_DIR;
+		}
 	}
 	if(flags & EXILE_FS_ALLOW_ALL_WRITE)
 	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_REG;
 		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
-		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
-		result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
-		result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
-	}
-	if(flags & EXILE_FS_ALLOW_DEV)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
-		result |= LANDLOCK_ACCESS_FS_MAKE_CHAR;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_BLOCK)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_CHAR)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_CHAR;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_DIR)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_DIR;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_FIFO)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_FIFO;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_REG)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_REG;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_SOCK)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_SOCK;
-	}
-	if(flags & EXILE_FS_ALLOW_MAKE_SYM)
-	{
-		result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
-	}
-	if(flags & EXILE_FS_ALLOW_REMOVE)
-	{
-		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
-		result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
-	}
-	if(flags & EXILE_FS_ALLOW_REMOVE_DIR)
-	{
-		result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
-	}
-	if(flags & EXILE_FS_ALLOW_REMOVE_FILE)
-	{
-		result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+		if(S_ISDIR(statmode))
+		{
+			result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+			result |= LANDLOCK_ACCESS_FS_MAKE_REG;
+			result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+			result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
+		}
 	}
 	if(flags & EXILE_FS_ALLOW_EXEC)
 	{
@@ -1485,9 +1445,58 @@ static unsigned int exile_flags_to_landlock(unsigned int flags)
 	{
 		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
 	}
-	if(flags & EXILE_FS_ALLOW_READ_DIR)
+	if(S_ISDIR(statmode))
 	{
-		result |= LANDLOCK_ACCESS_FS_READ_DIR;
+		if(flags & EXILE_FS_ALLOW_DEV)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
+			result |= LANDLOCK_ACCESS_FS_MAKE_CHAR;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_BLOCK)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_BLOCK;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_CHAR)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_CHAR;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_DIR)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_DIR;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_FIFO)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_FIFO;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_REG)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_REG;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_SOCK)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_SOCK;
+		}
+		if(flags & EXILE_FS_ALLOW_MAKE_SYM)
+		{
+			result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
+		}
+		if(flags & EXILE_FS_ALLOW_REMOVE)
+		{
+			result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+			result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+		}
+		if(flags & EXILE_FS_ALLOW_REMOVE_DIR)
+		{
+			result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+		}
+		if(flags & EXILE_FS_ALLOW_REMOVE_FILE)
+		{
+			result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+		}
+		if(flags & EXILE_FS_ALLOW_READ_DIR)
+		{
+			result |= LANDLOCK_ACCESS_FS_READ_DIR;
+		}
 	}
 	return result;
 }
@@ -1518,8 +1527,16 @@ static int landlock_prepare_ruleset(struct exile_path_policy *policies)
 			close(ruleset_fd);
 			return path_beneath.parent_fd;
 		}
-		path_beneath.allowed_access = exile_flags_to_landlock(policy->policy);
-		int ret = landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &path_beneath, 0);
+		struct stat sb;
+		int ret = fstat(path_beneath.parent_fd, &sb);
+		if(ret)
+		{
+			EXILE_LOG_ERROR("landlock_prepare_ruleset(): fstat failed %s\n", strerror(errno));
+			close(ruleset_fd);
+			return ret;
+		}
+		path_beneath.allowed_access = exile_flags_to_landlock(policy->policy, sb.st_mode);
+		ret = landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &path_beneath, 0);
 		if(ret)
 		{
 			EXILE_LOG_ERROR("Failed to update ruleset while processsing policy path %s\n", policy->path);
