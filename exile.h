@@ -1092,28 +1092,39 @@ static int path_policy_needs_landlock(struct exile_path_policy *path_policy)
 	return 0;
 }
 
+/* TODO: we can do va_args */
+char *concat_path(const char *first, const char *second)
+{
+	char *result = (char *) calloc(1, PATH_MAX);
+	if(result == NULL)
+	{
+		EXILE_LOG_ERROR("exile: concat_path: calloc failed\n");
+		return NULL;
+	}
+	//TODO: We can strip multiple redundant slashes
+	int written = snprintf(result, PATH_MAX, "%s/%s", first, second);
+	if(written < 0)
+	{
+		EXILE_LOG_ERROR("exile: concat_path: Error during path concatination\n");
+		return NULL;
+	}
+	if(written >= PATH_MAX)
+	{
+		EXILE_LOG_ERROR("exile: mount_to_chroot: path concatination truncated\n");
+		return NULL;
+	}
+	return result;
+}
+
+
 /* Helper to mount directories into the chroot path "chroot_target_path"
  * Paths will be created if necessary
 
  * @returns: 0 on sucess, -ERRNO on failure */
-static int mount_to_chroot(const char *chroot_target_path, struct exile_path_policy *path_policy)
+static int create_chroot_dirs(const char *chroot_target_path, struct exile_path_policy *path_policy)
 {
 	while(path_policy != NULL)
 	{
-
-		char path_inside_chroot[PATH_MAX];
-		int written = snprintf(path_inside_chroot, sizeof(path_inside_chroot), "%s/%s", chroot_target_path, path_policy->path);
-		if(written < 0)
-		{
-			EXILE_LOG_ERROR("exile: mount_to_chroot: Error during path concatination\n");
-			return -EINVAL;
-		}
-		if(written >= PATH_MAX)
-		{
-			EXILE_LOG_ERROR("exile: mount_to_chroot: path concatination truncated\n");
-			return -EINVAL;
-		}
-		
 		struct stat sb;
 		int ret = stat(path_policy->path, &sb);
 		if(ret < 0)
@@ -1121,31 +1132,54 @@ static int mount_to_chroot(const char *chroot_target_path, struct exile_path_pol
 			EXILE_LOG_ERROR("mount_to_chroot(): stat failed\n");
 			return ret;
 		}
-	
+
 		int baseisfile = 0;
 		if(S_ISREG(sb.st_mode))
 		{
 			baseisfile = 1;
 		}
+
+		char *path_inside_chroot = concat_path(chroot_target_path, path_policy->path);
+		if(path_inside_chroot == NULL)
+		{
+			return 1;
+		}
+
 		ret = mkpath(path_inside_chroot, 0700, baseisfile);
 		if(ret < 0)
 		{
 			EXILE_LOG_ERROR("Error creating directory structure while mounting paths to chroot. %s\n", strerror(errno));
+			free(path_inside_chroot);
 			return ret;
 		}
+		path_policy = path_policy->next;
+		free(path_inside_chroot);
+	}
 
+	return 0;
+}
+
+static int perform_mounts(const char *chroot_target_path, struct exile_path_policy *path_policy)
+{
+	while(path_policy != NULL)
+	{
 		int mount_flags = get_policy_mount_flags(path_policy);
 
+		char *path_inside_chroot = concat_path(chroot_target_path, path_policy->path);
+		if(path_inside_chroot == NULL)
+		{
+			return 1;
+		}
 		//all we do is bind mounts
 		mount_flags |= MS_BIND;
 
-
 		if(path_policy->policy & EXILE_FS_ALLOW_ALL_READ || path_policy->policy & EXILE_FS_ALLOW_ALL_WRITE)
 		{
-			ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
+			int ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
 			{
 				EXILE_LOG_ERROR("Error: Failed to mount %s to %s: %s\n", path_policy->path, path_inside_chroot, strerror(errno));
+				free(path_inside_chroot);
 				return ret;
 			}
 
@@ -1154,14 +1188,17 @@ static int mount_to_chroot(const char *chroot_target_path, struct exile_path_pol
 			if(ret < 0 )
 			{
 				EXILE_LOG_ERROR("Error: Failed to remount %s: %s\n", path_inside_chroot, strerror(errno));
+				free(path_inside_chroot);
 				return ret;
 			}
+			path_policy = path_policy->next;
+			free(path_inside_chroot);
 		}
-		path_policy = path_policy->next;
 	}
-
 	return 0;
 }
+
+
 
 /*
  * Frees the memory taken by a exile_policy object
@@ -1767,9 +1804,15 @@ int exile_enable_policy(struct exile_policy *policy)
 			}
 		}
 
-		if(mount_to_chroot(policy->chroot_target_path, policy->path_policies) < 0)
+		if(create_chroot_dirs(policy->chroot_target_path, policy->path_policies) < 0)
 		{
 			EXILE_LOG_ERROR("mount_to_chroot: bind mounting of path policies failed\n");
+			return -1;
+		}
+
+		if(perform_mounts(policy->chroot_target_path, policy->path_policies) < 0)
+		{
+			EXILE_LOG_ERROR("perform_mounts: Failed to remount\n");
 			return -1;
 		}
 	}
