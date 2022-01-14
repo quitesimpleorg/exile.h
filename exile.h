@@ -2002,3 +2002,148 @@ int exile_vow(uint64_t promises)
 	exile_free_policy(policy);
 	return ret;
 }
+
+struct exile_launch_params
+{
+	struct exile_policy *policy; /* Policy to activate before jumping to func */
+	int (*func)(void *); /* Function to be sandboxed */
+	void *funcarg; /* Arg to be passed */
+};
+
+struct exile_launch_result
+{
+	int tid;
+	int fd;
+};
+
+static int pipefds[2];
+
+static int exile_clone_handle(void *arg)
+{
+	struct exile_launch_params *params = (struct exile_launch_params *) arg;
+	struct exile_policy *policy = (struct exile_policy *) params->policy;
+
+	int ret = exile_enable_policy(policy);
+	if(ret != 0)
+	{
+		EXILE_LOG_ERROR("Error: exile_clone_handle(): Failed to enable policy\n");
+		close(pipefds[1]);
+		return 1;
+	}
+	ret = dup2(pipefds[1], 1);
+	if(ret == -1)
+	{
+		EXILE_LOG_ERROR("Error: exile_clone_handle(): Failed to redirect stdout to pipe\n");
+		return 1;
+	}
+	ret = params->func(params->funcarg);
+	fclose(stdout);
+	close(pipefds[1]);
+	return ret;
+}
+
+/* Helper to easily execute a single function sandboxed.
+ *
+ * Creates a child-process, then activates the policy contained in launch_params,
+ * and jumps to the specified function, passing the specified argument to it.
+ * Returns a fd connected to stdout in the child process.
+ * if cloneflags is 0, the default ones are passed to clone(), otherwise the value of cloneflags
+ *
+ * Return value: Negative on error, otherwise the file descriptor to read from*/
+int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_result *launch_result)
+{
+
+	int ret = pipe(pipefds);
+	if(ret != 0)
+	{
+		EXILE_LOG_ERROR("exile_launch_fds: pipe failed\n");
+		return ret;
+	}
+
+	struct rlimit rlimit;
+	ret = getrlimit(RLIMIT_STACK, &rlimit);
+	if(ret != 0)
+	{
+		EXILE_LOG_ERROR("exile_launch: Failed to get stack size: %s\n", strerror(errno));
+		return ret;
+	}
+	size_t size = rlimit.rlim_cur;
+	char *stack = (char *) calloc(1, size);
+	if(stack == NULL)
+	{
+		EXILE_LOG_ERROR("Failed to allocate stack memory for child\n");
+		return 1;
+	}
+	stack += size;
+	ret = clone(&exile_clone_handle, stack, 17 /* SIGCHLD */, launch_params);
+	if(ret == -1)
+	{
+		EXILE_LOG_ERROR("exile_launch: clone failed(): %s\n", strerror(errno));
+		return ret;
+	}
+	close(pipefds[1]);
+	launch_result->tid = ret;
+	launch_result->fd = pipefds[0];
+	return 0;
+}
+
+/* Helper for exile_launch, to easily read all output from a function
+* This function will read all output from a sandboxed function. It's up to the caller to ensure
+* that enough memory will be available.
+*
+* The result is \0 terminated. The "n" parameter contains the size of the result, not including the \0.
+*
+* Return value: All data written by the function. The result should be passed to free() once not needed. NULL will
+* be returned on error.
+*/
+char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
+{
+	*n = 0;
+	struct exile_launch_result launch_result;
+	int launch = exile_launch(launch_params, &launch_result);
+	if(launch < 0)
+	{
+		return NULL;
+	}
+	char *result = NULL;
+	size_t size = 0;
+	FILE *stream = open_memstream(&result, &size);
+	while(1)
+	{
+		char buffer[4096];
+		int ret = read(launch_result.fd, buffer, sizeof(buffer));
+		if(ret == 0)
+		{
+			break;
+		}
+		if(ret == -1)
+		{
+			if(errno == EINTR)
+			{
+				continue;
+			}
+			return NULL;
+		}
+		size_t written = fwrite(buffer, 1, ret, stream);
+		if(written != (size_t) ret)
+		{
+			if(ferror(stream))
+			{
+				/* TODO: can we seek and free? */
+				close(launch_result.fd);
+				return NULL;
+			}
+		}
+	}
+	fclose(stream);
+	int seek = fseek(stream, 0, SEEK_SET);
+	if(seek == -1)
+	{
+		EXILE_LOG_ERROR("exile_launch_get(): fseek failed\n");
+		close(launch_result.fd);
+		return NULL;
+	}
+	close(launch_result.fd);
+	*n = size;
+	return result;
+}
