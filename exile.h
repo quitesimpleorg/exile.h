@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Albert S. <mail at quitesimple dot org>
+ * Copyright (c) 2019-2022 Albert Schwarzkopf <mail at quitesimple dot org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
