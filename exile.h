@@ -1136,9 +1136,7 @@ char *concat_path(const char *first, const char *second)
 }
 
 
-/* Helper to mount directories into the chroot path "chroot_target_path"
- * Paths will be created if necessary
-
+/* Creates the file system hierarchy for the chroot
  * @returns: 0 on sucess, -ERRNO on failure */
 static int create_chroot_dirs(const char *chroot_target_path, struct exile_path_policy *path_policy)
 {
