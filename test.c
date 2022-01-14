@@ -543,6 +543,78 @@ int test_fail_flags()
 	return 0;
 }
 
+int do_launch_test(void *arg)
+{
+	int num = *(int *)(arg);
+	num += 1;
+	printf("Sandboxed +1: %i\n", num);
+	fflush(stdout);
+	return 0;
+}
+
+int test_launch()
+{
+	struct exile_policy *policy = exile_init_policy();
+	struct exile_launch_params params = { 0 };
+	struct exile_launch_result res = {0};
+	int num = 22;
+	params.func = &do_launch_test;
+	params.funcarg = &num;
+	params.policy = policy;
+	int launchfd = exile_launch(&params, &res);
+	if(launchfd < 0)
+	{
+		printf("Failed to launch\n");
+		return 1;
+	}
+
+	char buffer[4096];
+	int s = read(res.fd, buffer, sizeof(buffer));
+	write(1, buffer, s);
+	printf("Before wait, got: %i\n", s);
+	fflush(stdout);
+	int status = 0;
+	waitpid(res.tid, &status, __WALL);
+	if(WIFEXITED(status))
+	{
+		status = WEXITSTATUS(status);
+		return status;
+	}
+	return 1;
+
+}
+
+#define LAUNCH_GET_TEST_STR "Control yourself. Take only what you need from it.\n"
+int do_launch_get_test(void *a)
+{
+	fprintf(stdout, LAUNCH_GET_TEST_STR);
+	return 0;
+}
+
+int test_launch_get()
+{
+	struct exile_policy *policy = exile_init_policy();
+	struct exile_launch_params params = { 0 };
+	params.func = &do_launch_get_test;
+	params.funcarg = NULL;
+	params.policy = policy;
+
+	size_t n = 0;
+	char *content = exile_launch_get(&params, &n);
+	unsigned int len = strlen(LAUNCH_GET_TEST_STR);
+	if(n != strlen(LAUNCH_GET_TEST_STR))
+	{
+		printf("Lenght does does not match: %lu vs %u\n", n, len);
+		return 1;
+	}
+	if(strcmp(content, LAUNCH_GET_TEST_STR) != 0)
+	{
+		printf("Received content differs\n");
+		return 1;
+	}
+	return 0;
+}
+
 struct dispatcher
 {
 	char *name;
@@ -567,6 +639,8 @@ struct dispatcher dispatchers[] = {
 	{ "no_new_fds", &test_no_new_fds},
 	{ "mkpath", &test_mkpath},
 	{ "failflags", &test_fail_flags},
+	{ "launch", &test_launch},
+	{ "launch-get", &test_launch_get},
 };
 
 int main(int argc, char *argv[])
