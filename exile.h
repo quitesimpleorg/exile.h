@@ -361,7 +361,7 @@ struct exile_policy
 
 	uint64_t vow_promises;
 
-	/* Do not manually add policies here, use exile_append_path_polic*() */
+	/* Do not manually add policies here, use exile_append_path_policies() */
 	struct exile_path_policy *path_policies;
 	struct exile_path_policy **path_policies_tail;
 
@@ -931,6 +931,7 @@ struct exile_policy *exile_init_policy()
 	return result;
 }
 
+
 /* Appends path policies to the exile_policy object
  * The last paramater must be NULL
  *
@@ -976,12 +977,7 @@ int exile_append_path_policies(struct exile_policy *exile_policy, unsigned int p
 	return 0;
 }
 
-int exile_append_path_policy(struct exile_policy *exile_policy, unsigned int path_policy, const char *path)
-{
-	return exile_append_path_policies(exile_policy, path_policy, path, NULL);
-}
-
-
+#define exile_append_path_policies(e, p, ...) exile_append_path_policies(e, p, __VA_ARGS__, NULL)
 
 /*
  * Fills buffer with random characters a-z.

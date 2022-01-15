@@ -404,7 +404,7 @@ int test_landlock()
 		return 1;
 	}
 	struct exile_policy *policy = exile_init_policy();
-	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/proc/self/fd");
+	exile_append_path_policies(policy, EXILE_FS_ALLOW_ALL_READ, "/proc/self/fd");
 	xexile_enable_policy(policy);
 
 	int fd = open("/", O_RDONLY | O_CLOEXEC);
@@ -418,7 +418,7 @@ int test_landlock()
 int test_landlock_deny_write()
 {
 	struct exile_policy *policy = exile_init_policy();
-	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/tmp/");
+	exile_append_path_policies(policy, EXILE_FS_ALLOW_ALL_READ, "/tmp/");
 	xexile_enable_policy(policy);
 
 	int fd = open("/tmp/a", O_WRONLY | O_CLOEXEC);
@@ -533,7 +533,7 @@ int test_mkpath()
 int test_fail_flags()
 {
 	struct exile_policy *policy = exile_init_policy();
-	exile_append_path_policy(policy, EXILE_FS_ALLOW_ALL_READ, "/nosuchpathexists");
+	exile_append_path_policies(policy, EXILE_FS_ALLOW_ALL_READ, "/nosuchpathexists");
 	int ret = exile_enable_policy(policy);
 	if(ret == 0)
 	{
