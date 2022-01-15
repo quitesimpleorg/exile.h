@@ -489,6 +489,7 @@ int test_no_new_fds()
 
 int test_mkpath()
 {
+	system("rm -rf /tmp/.exile.h/");
 	const char *filepath = "/tmp/.exile.h/test_mkpath/some/sub/dir/file";
 	const char *dirpath =  "/tmp/.exile.h/test_mkpath/some/other/sub/dir";
 	int ret = mkpath(filepath,  0700, 1);
@@ -527,6 +528,7 @@ int test_mkpath()
 		fprintf(stderr, "Failed: mkpath did not create a directory: %i\n", ret);
 		return 1;
 	}
+	system("rm -rf /tmp/.exile.h/");
 	return 0;
 }
 
