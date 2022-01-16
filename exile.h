@@ -2133,17 +2133,19 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 			{
 				continue;
 			}
+			EXILE_LOG_ERROR("Failed to read from read file descriptor\n");
+			close(launch_result.read_fd);
+			fclose(stream);
 			return NULL;
 		}
 		size_t written = fwrite(buffer, 1, ret, stream);
 		if(written != (size_t) ret)
 		{
-			if(ferror(stream))
-			{
-				/* TODO: can we seek and free? */
-				close(launch_result.read_fd);
-				return NULL;
-			}
+			EXILE_LOG_ERROR("Short item write");
+			/* TODO: can we seek and free? */
+			close(launch_result.read_fd);
+			fclose(stream);
+			return NULL;
 		}
 	}
 	fclose(stream);
