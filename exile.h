@@ -77,7 +77,7 @@
 #define EXILE_UNSHARE_MOUNT 1<<3
 
 #ifndef EXILE_LOG_ERROR
-#define EXILE_LOG_ERROR(...) fprintf(stderr, __VA_ARGS__)
+#define EXILE_LOG_ERROR(...) do { fprintf(stderr, "exile.h: %s(): Error: ", __func__); fprintf(stderr, __VA_ARGS__); } while(0)
 #endif
 
 #ifndef EXILE_TEMP_DIR
@@ -1012,12 +1012,12 @@ static int mkpath(const char *p, mode_t mode, int baseisfile)
 	int ret = snprintf(path, sizeof(path), "%s%c", p, (baseisfile) ? '\0' : '/');
 	if(ret < 0)
 	{
-		EXILE_LOG_ERROR("exile: mkdir_structure: error during path concatination\n");
+		EXILE_LOG_ERROR("error during path concatination\n");
 		return -EINVAL;
 	}
 	if((size_t)ret >= sizeof(path))
 	{
-		EXILE_LOG_ERROR("exile: mkdir_structure: path concatination truncated\n");
+		EXILE_LOG_ERROR("path concatination truncated\n");
 		return -EINVAL;
 	}
 
@@ -1113,19 +1113,19 @@ char *concat_path(const char *first, const char *second)
 	char *result = (char *) calloc(1, PATH_MAX);
 	if(result == NULL)
 	{
-		EXILE_LOG_ERROR("exile: concat_path: calloc failed\n");
+		EXILE_LOG_ERROR("calloc failed\n");
 		return NULL;
 	}
 	//TODO: We can strip multiple redundant slashes
 	int written = snprintf(result, PATH_MAX, "%s/%s", first, second);
 	if(written < 0)
 	{
-		EXILE_LOG_ERROR("exile: concat_path: Error during path concatination\n");
+		EXILE_LOG_ERROR("Error during path concatination\n");
 		return NULL;
 	}
 	if(written >= PATH_MAX)
 	{
-		EXILE_LOG_ERROR("exile: mount_to_chroot: path concatination truncated\n");
+		EXILE_LOG_ERROR("path concatination truncated\n");
 		return NULL;
 	}
 	return result;
@@ -1142,7 +1142,7 @@ static int create_chroot_dirs(const char *chroot_target_path, struct exile_path_
 		int ret = stat(path_policy->path, &sb);
 		if(ret < 0)
 		{
-			EXILE_LOG_ERROR("mount_to_chroot(): stat failed\n");
+			EXILE_LOG_ERROR("stat failed\n");
 			return ret;
 		}
 
@@ -1191,7 +1191,7 @@ static int perform_mounts(const char *chroot_target_path, struct exile_path_poli
 			int ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
 			{
-				EXILE_LOG_ERROR("Error: Failed to mount %s to %s: %s\n", path_policy->path, path_inside_chroot, strerror(errno));
+				EXILE_LOG_ERROR("Failed to mount %s to %s: %s\n", path_policy->path, path_inside_chroot, strerror(errno));
 				free(path_inside_chroot);
 				return ret;
 			}
@@ -1200,7 +1200,7 @@ static int perform_mounts(const char *chroot_target_path, struct exile_path_poli
 			ret = mount(NULL, path_inside_chroot, NULL, mount_flags | MS_REMOUNT, NULL);
 			if(ret < 0 )
 			{
-				EXILE_LOG_ERROR("Error: Failed to remount %s: %s\n", path_inside_chroot, strerror(errno));
+				EXILE_LOG_ERROR("Failed to remount %s: %s\n", path_inside_chroot, strerror(errno));
 				free(path_inside_chroot);
 				return ret;
 			}
@@ -1247,7 +1247,7 @@ static int enter_namespaces(int namespace_options)
 		int ret = unshare(CLONE_NEWUSER);
 		if(ret == -1)
 		{
-			EXILE_LOG_ERROR("Error: Failed to unshare user namespaces: %s\n", strerror(errno));
+			EXILE_LOG_ERROR("Failed to unshare user namespaces: %s\n", strerror(errno));
 			return ret;
 		}
 
@@ -1299,7 +1299,7 @@ static int enter_namespaces(int namespace_options)
 		int ret = unshare(CLONE_NEWNS);
 		if(ret == -1)
 		{
-			EXILE_LOG_ERROR("Error: Failed to unshare mount namespaces: %s\n", strerror(errno));
+			EXILE_LOG_ERROR("Failed to unshare mount namespaces: %s\n", strerror(errno));
 			return ret;
 		}
 	}
@@ -1309,7 +1309,7 @@ static int enter_namespaces(int namespace_options)
 		int ret = unshare(CLONE_NEWNET);
 		if(ret == -1)
 		{
-			EXILE_LOG_ERROR("Error: Failed to unshare network namespace: %s\n", strerror(errno));
+			EXILE_LOG_ERROR("Failed to unshare network namespace: %s\n", strerror(errno));
 			return ret;
 		}
 	}
@@ -1383,7 +1383,7 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 			__u8 next_syscall_pc =  1;
 			if(__builtin_add_overflow(next_syscall_pc,  syscallpolicy->argfilterscount, &next_syscall_pc))
 			{
-					EXILE_LOG_ERROR("Error: Overflow while trying to calculate jump offset\n");
+					EXILE_LOG_ERROR("Overflow while trying to calculate jump offset\n");
 					/* TODO: Return error */
 					return;
 			}
@@ -1599,7 +1599,7 @@ static int landlock_prepare_ruleset(struct exile_path_policy *policies)
 		int ret = fstat(path_beneath.parent_fd, &sb);
 		if(ret)
 		{
-			EXILE_LOG_ERROR("landlock_prepare_ruleset(): fstat failed %s\n", strerror(errno));
+			EXILE_LOG_ERROR("fstat failed %s\n", strerror(errno));
 			close(ruleset_fd);
 			return ret;
 		}
@@ -1638,7 +1638,7 @@ static int check_policy_sanity(struct exile_policy *policy)
 		{
 			if(path_policy_needs_landlock(path_policy))
 			{
-				EXILE_LOG_ERROR("Error: A path policy needs landlock, but landlock is not available. Fallback not possible\n");
+				EXILE_LOG_ERROR("A path policy needs landlock, but landlock is not available. Fallback not possible\n");
 				return -1;
 			}
 			path_policy = path_policy->next;
@@ -1651,7 +1651,7 @@ static int check_policy_sanity(struct exile_policy *policy)
 	{
 		if(policy->path_policies == NULL)
 		{
-			EXILE_LOG_ERROR("Cannot mount path policies to chroot if non are given\n");
+			EXILE_LOG_ERROR("Cannot mount path policies to chroot if none are given\n");
 			return -1;
 		}
 		if(!(policy->namespace_options & EXILE_UNSHARE_MOUNT))
@@ -1776,12 +1776,12 @@ int exile_enable_policy(struct exile_policy *policy)
 {
 	if((policy->exile_flags & EXILE_FLAG_ADD_PATH_POLICY_FAIL) || (policy->exile_flags & EXILE_FLAG_ADD_SYSCALL_POLICY_FAIL))
 	{
-		EXILE_LOG_ERROR("Error: At least one syscall or path policy was not successfully added!\n");
+		EXILE_LOG_ERROR("At least one syscall or path policy was not successfully added!\n");
 		return -1;
 	}
 	if(check_policy_sanity(policy) != 0)
 	{
-		EXILE_LOG_ERROR("Error: Policy sanity check failed. Cannot apply policy!\n");
+		EXILE_LOG_ERROR("Policy sanity check failed. Cannot apply policy!\n");
 		return -EINVAL;
 	}
 
@@ -1806,12 +1806,12 @@ int exile_enable_policy(struct exile_policy *policy)
 				int res = snprintf(policy->chroot_target_path, sizeof(policy->chroot_target_path), "%s/.sandbox_%" PRIdMAX "_%s", EXILE_TEMP_DIR, (intmax_t)getpid(), random_str);
 				if(res < 0)
 				{
-					EXILE_LOG_ERROR("exile: exile_enable_policy: error during path concatination\n");
+					EXILE_LOG_ERROR("error during path concatination\n");
 					return -EINVAL;
 				}
 				if(res >= PATH_MAX)
 				{
-					EXILE_LOG_ERROR("exile: exile_enable_policy: path concatination truncated\n");
+					EXILE_LOG_ERROR("path concatination truncated\n");
 					return -EINVAL;
 				}
 			}
@@ -1824,13 +1824,13 @@ int exile_enable_policy(struct exile_policy *policy)
 
 		if(create_chroot_dirs(policy->chroot_target_path, policy->path_policies) < 0)
 		{
-			EXILE_LOG_ERROR("mount_to_chroot: bind mounting of path policies failed\n");
+			EXILE_LOG_ERROR("bind mounting of path policies failed\n");
 			return -1;
 		}
 
 		if(perform_mounts(policy->chroot_target_path, policy->path_policies) < 0)
 		{
-			EXILE_LOG_ERROR("perform_mounts: Failed to remount\n");
+			EXILE_LOG_ERROR("Failed to remount\n");
 			return -1;
 		}
 	}
@@ -1839,7 +1839,7 @@ int exile_enable_policy(struct exile_policy *policy)
 	{
 		if(chroot(policy->chroot_target_path) < 0)
 		{
-			EXILE_LOG_ERROR("chroot: failed to enter %s\n", policy->chroot_target_path);
+			EXILE_LOG_ERROR("failed to enter %s\n", policy->chroot_target_path);
 			return -1;
 		}
 		const char *chdir_target_path = policy->chdir_path;
@@ -1862,7 +1862,7 @@ int exile_enable_policy(struct exile_policy *policy)
 		landlock_ruleset_fd = landlock_prepare_ruleset(policy->path_policies);
 		if(landlock_ruleset_fd < 0)
 		{
-			EXILE_LOG_ERROR("landlock_prepare_ruleset: Failed to prepare landlock ruleset: %s\n", strerror(errno));
+			EXILE_LOG_ERROR("Failed to prepare landlock ruleset: %s\n", strerror(errno));
 			return -1;
 		}
 	}
@@ -2022,14 +2022,14 @@ static int exile_clone_handle(void *arg)
 	int ret = exile_enable_policy(policy);
 	if(ret != 0)
 	{
-		EXILE_LOG_ERROR("Error: exile_clone_handle(): Failed to enable policy\n");
+		EXILE_LOG_ERROR("Failed to enable policy\n");
 		close(pipefds[1]);
 		return 1;
 	}
 	ret = dup2(pipefds[1], 1);
 	if(ret == -1)
 	{
-		EXILE_LOG_ERROR("Error: exile_clone_handle(): Failed to redirect stdout to pipe\n");
+		EXILE_LOG_ERROR("Failed to redirect stdout to pipe\n");
 		return 1;
 	}
 	ret = params->func(params->funcarg);
@@ -2052,7 +2052,7 @@ int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_
 	int ret = pipe(pipefds);
 	if(ret != 0)
 	{
-		EXILE_LOG_ERROR("exile_launch_fds: pipe failed\n");
+		EXILE_LOG_ERROR("pipe failed\n");
 		return ret;
 	}
 
@@ -2060,7 +2060,7 @@ int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_
 	ret = getrlimit(RLIMIT_STACK, &rlimit);
 	if(ret != 0)
 	{
-		EXILE_LOG_ERROR("exile_launch: Failed to get stack size: %s\n", strerror(errno));
+		EXILE_LOG_ERROR("Failed to get stack size: %s\n", strerror(errno));
 		return ret;
 	}
 	size_t size = rlimit.rlim_cur;
@@ -2074,7 +2074,7 @@ int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_
 	ret = clone(&exile_clone_handle, stack, 17 /* SIGCHLD */, launch_params);
 	if(ret == -1)
 	{
-		EXILE_LOG_ERROR("exile_launch: clone failed(): %s\n", strerror(errno));
+		EXILE_LOG_ERROR("clone failed(): %s\n", strerror(errno));
 		return ret;
 	}
 	close(pipefds[1]);
@@ -2135,7 +2135,7 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 	int seek = fseek(stream, 0, SEEK_SET);
 	if(seek == -1)
 	{
-		EXILE_LOG_ERROR("exile_launch_get(): fseek failed\n");
+		EXILE_LOG_ERROR("fseek failed\n");
 		close(launch_result.fd);
 		return NULL;
 	}
