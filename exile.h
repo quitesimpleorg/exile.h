@@ -2009,10 +2009,12 @@ struct exile_launch_params
 struct exile_launch_result
 {
 	int tid;
-	int fd;
+	int read_fd;
+	int write_fd;
 };
 
-static int pipefds[2];
+static int child_read_pipe[2];
+static int child_write_pipe[2];
 
 static int exile_clone_handle(void *arg)
 {
@@ -2023,10 +2025,11 @@ static int exile_clone_handle(void *arg)
 	if(ret != 0)
 	{
 		EXILE_LOG_ERROR("Failed to enable policy\n");
-		close(pipefds[1]);
+		close(child_read_pipe[1]);
+		close(child_write_pipe[0]);
 		return 1;
 	}
-	ret = dup2(pipefds[1], 1);
+	ret = dup2(child_read_pipe[1], 1);
 	if(ret == -1)
 	{
 		EXILE_LOG_ERROR("Failed to redirect stdout to pipe\n");
@@ -2034,7 +2037,8 @@ static int exile_clone_handle(void *arg)
 	}
 	ret = params->func(params->funcarg);
 	fclose(stdout);
-	close(pipefds[1]);
+	close(child_read_pipe[1]);
+	close(child_write_pipe[0]);
 	return ret;
 }
 
@@ -2042,17 +2046,25 @@ static int exile_clone_handle(void *arg)
  *
  * Creates a child-process, then activates the policy contained in launch_params,
  * and jumps to the specified function, passing the specified argument to it.
- * Returns a fd connected to stdout in the child process.
+ * Returns a fd connected to stdout in the child process, as well as a fd allowing to write
+ * to the child.
+ *
  * if cloneflags is 0, the default ones are passed to clone(), otherwise the value of cloneflags
  *
  * Return value: Negative on error, otherwise the file descriptor to read from*/
 int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_result *launch_result)
 {
-
-	int ret = pipe(pipefds);
+	int ret = pipe(child_read_pipe);
 	if(ret != 0)
 	{
-		EXILE_LOG_ERROR("pipe failed\n");
+		EXILE_LOG_ERROR("read pipe creation failed\n");
+		return ret;
+	}
+
+	ret = pipe(child_write_pipe);
+	if(ret != 0)
+	{
+		EXILE_LOG_ERROR("write pipe creation failed\n");
 		return ret;
 	}
 
@@ -2077,9 +2089,12 @@ int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_
 		EXILE_LOG_ERROR("clone failed(): %s\n", strerror(errno));
 		return ret;
 	}
-	close(pipefds[1]);
+	close(child_read_pipe[1]);
+	close(child_write_pipe[0]);
+
 	launch_result->tid = ret;
-	launch_result->fd = pipefds[0];
+	launch_result->read_fd = child_read_pipe[0];
+	launch_result->write_fd = child_write_pipe[1];
 	return 0;
 }
 
@@ -2107,7 +2122,7 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 	while(1)
 	{
 		char buffer[4096];
-		int ret = read(launch_result.fd, buffer, sizeof(buffer));
+		int ret = read(launch_result.read_fd, buffer, sizeof(buffer));
 		if(ret == 0)
 		{
 			break;
@@ -2126,7 +2141,7 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 			if(ferror(stream))
 			{
 				/* TODO: can we seek and free? */
-				close(launch_result.fd);
+				close(launch_result.read_fd);
 				return NULL;
 			}
 		}
@@ -2136,10 +2151,10 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 	if(seek == -1)
 	{
 		EXILE_LOG_ERROR("fseek failed\n");
-		close(launch_result.fd);
+		close(launch_result.read_fd);
 		return NULL;
 	}
-	close(launch_result.fd);
+	close(launch_result.read_fd);
 	*n = size;
 	return result;
 }

@@ -549,7 +549,10 @@ int do_launch_test(void *arg)
 {
 	int num = *(int *)(arg);
 	num += 1;
+	char buffer[512] = { 0 };
+	read(child_write_pipe[0], buffer, sizeof(buffer)-1);
 	printf("Sandboxed +1: %i\n", num);
+	printf("Echoing: %s\n", buffer);
 	fflush(stdout);
 	return 0;
 }
@@ -570,11 +573,16 @@ int test_launch()
 		return 1;
 	}
 
-	char buffer[4096];
-	int s = read(res.fd, buffer, sizeof(buffer));
+	char buffer[4096] = { 0 };
+	write(res.write_fd, "1234", 4);
+	int s = read(res.read_fd, buffer, sizeof(buffer)-1);
 	write(1, buffer, s);
 	printf("Before wait, got: %i\n", s);
 	fflush(stdout);
+	if(strstr(buffer, "Echoing: 1234") == NULL)
+	{
+		printf("Failed: Did not get back what we wrote\n");
+	}
 	int status = 0;
 	waitpid(res.tid, &status, __WALL);
 	if(WIFEXITED(status))
