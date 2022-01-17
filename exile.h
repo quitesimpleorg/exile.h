@@ -245,6 +245,12 @@ struct syscall_vow_map
 	uint64_t vowmask;
 };
 
+struct str_to_vow_map
+{
+	char *str;
+	uint64_t value;
+};
+
 struct exile_path_policy
 {
 	const char *path;
@@ -644,6 +650,73 @@ static struct syscall_vow_map exile_vow_map[] =
 	{EXILE_SYS(futex_waitv), EXILE_SYSCALL_VOW_THREAD}
 };
 
+struct str_to_vow_map str_to_vow_map[] =
+{
+	{ "chown", EXILE_SYSCALL_VOW_CHOWN},
+	{ "clone", EXILE_SYSCALL_VOW_CLONE},
+	{ "cpath", EXILE_SYSCALL_VOW_CPATH},
+	{ "dpath", EXILE_SYSCALL_VOW_DPATH},
+	{ "exec", EXILE_SYSCALL_VOW_EXEC},
+	{ "fattr", EXILE_SYSCALL_VOW_FATTR},
+	{ "fsnotify", EXILE_SYSCALL_VOW_FSNOTIFY},
+	{ "id", EXILE_SYSCALL_VOW_ID},
+	{ "inet", EXILE_SYSCALL_VOW_INET},
+	{ "ioctl", EXILE_SYSCALL_VOW_IOCTL},
+	{ "prctl", EXILE_SYSCALL_VOW_PRCTL},
+	{ "proc", EXILE_SYSCALL_VOW_PROC},
+	{ "prot_exec", EXILE_SYSCALL_VOW_PROT_EXEC},
+	{ "rpath", EXILE_SYSCALL_VOW_RPATH},
+	{ "sched", EXILE_SYSCALL_VOW_SCHED},
+	{ "seccomp_install", EXILE_SYSCALL_VOW_SECCOMP_INSTALL},
+	{ "shm", EXILE_SYSCALL_VOW_SHM},
+	{ "stdio", EXILE_SYSCALL_VOW_STDIO},
+	{ "thread", EXILE_SYSCALL_VOW_THREAD},
+	{ "unix", EXILE_SYSCALL_VOW_UNIX},
+	{ "wpath", EXILE_SYSCALL_VOW_WPATH},
+	{ "error", EXILE_SYSCALL_VOW_DENY_ERROR}
+};
+
+/* Converts the whitespace separated vows strings to vows flags
+ *
+ * This mainly helps readability, as lots of flags ORed together is not
+ * very readable.
+ *
+ * If an unkown string is found, abort() is called.
+ */
+uint64_t exile_vows_from_str(const char *str)
+{
+	uint64_t result = 0;
+	char current[64] = { 0 };
+	char *ptr = current;
+	const char *end = ptr + sizeof(current)-1;
+	do
+	{
+		while(ptr <= end && *str != '\0' && *str != ' ')
+		{
+			*ptr = *str;
+			++ptr;
+			++str;
+		}
+		int found = 0;
+		for(size_t i = 0; i < sizeof(str_to_vow_map)/sizeof(str_to_vow_map[0]); i++)
+		{
+			if(strcmp(str_to_vow_map[i].str, current) == 0)
+			{
+				result |= str_to_vow_map[i].value;
+				found = 1;
+				break;
+			}
+		}
+		if(!found)
+		{
+			EXILE_LOG_ERROR("No such vow: %s\n", current);
+			abort();
+		}
+		memset(current, 0, sizeof(current));
+		ptr = current;
+	} while(*str++ != '\0');
+	return result;
+}
 
 static int is_valid_syscall_policy(unsigned int policy)
 {
@@ -1998,6 +2071,8 @@ int exile_vow(uint64_t promises)
 	exile_free_policy(policy);
 	return ret;
 }
+
+
 
 struct exile_launch_params
 {
