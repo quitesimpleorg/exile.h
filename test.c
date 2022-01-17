@@ -625,6 +625,18 @@ int test_launch_get()
 	return 0;
 }
 
+int test_vows_from_str()
+{
+	uint64_t expected = EXILE_SYSCALL_VOW_CHOWN | EXILE_SYSCALL_VOW_WPATH | EXILE_SYSCALL_VOW_INET | EXILE_SYSCALL_VOW_DENY_ERROR;
+	uint64_t actual = exile_vows_from_str("chown wpath inet error");
+	if(expected != actual)
+	{
+		printf("Masks don't match: %lu vs %lu\n", expected, actual);
+		return 1;
+	}
+	return 0;
+}
+
 struct dispatcher
 {
 	char *name;
@@ -651,6 +663,7 @@ struct dispatcher dispatchers[] = {
 	{ "failflags", &test_fail_flags},
 	{ "launch", &test_launch},
 	{ "launch-get", &test_launch_get},
+	{ "vow_from_str", &test_vows_from_str},
 };
 
 int main(int argc, char *argv[])
