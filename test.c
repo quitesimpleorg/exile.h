@@ -6,12 +6,14 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
+#define LOG(...) do { fprintf(stdout, "%s(): ", __func__); fprintf(stdout, __VA_ARGS__); } while(0)
+
 int xexile_enable_policy(struct exile_policy *policy)
 {
 	int ret = exile_enable_policy(policy);
 	if(ret != 0)
 	{
-		fprintf(stderr, "exile_enable_policy() failed: %i\n", ret);
+		LOG("failed: %i\n", ret);
 		exit(EXIT_FAILURE);
 	}
 	return 0;
@@ -38,16 +40,16 @@ static int test_expected_kill(int (*f)())
 		int c = WTERMSIG(status);
 		if(c == SIGSYS)
 		{
-			printf("Got expected signal\n");
+			LOG("Got expected signal\n");
 			return 0;
 		}
-		printf("Unexpected status code: %i\n", c);
+		LOG("Unexpected status code: %i\n", c);
 		return 1;
 	}
 	else
 	{
 		int c = WEXITSTATUS(status);
-		printf("Process was not killed, test fails. Status code of exit: %i\n", c);
+		LOG("Process was not killed, test fails. Status code of exit: %i\n", c);
 		return 1;
 	}
 	return 0;
@@ -67,7 +69,7 @@ static int test_successful_exit(int (*f)())
 	if(WIFSIGNALED(status))
 	{
 		int c = WTERMSIG(status);
-		printf("Received signal, which was not expected. Signal was: %i\n", c);
+		LOG("Received signal, which was not expected. Signal was: %i\n", c);
 		return 1;
 	}
 	else
@@ -75,11 +77,11 @@ static int test_successful_exit(int (*f)())
 		int c = WEXITSTATUS(status);
 		if(c != 0)
 		{
-			printf("Process failed to exit properly. Status code is: %i\n", c);
+			LOG("Process failed to exit properly. Status code is: %i\n", c);
 		}
 		return c;
 	}
-	printf("Process exited sucessfully as expected");
+	LOG("Process exited sucessfully as expected");
 	return 0;
 }
 
@@ -153,7 +155,7 @@ int test_seccomp_require_last_matchall()
 	int status = exile_enable_policy(policy);
 	if(status == 0)
 	{
-		printf("Failed. Should not have been enabled!");
+		LOG("Failed. Should not have been enabled!");
 		return 1;
 	}
 	return 0;
@@ -170,7 +172,7 @@ static int do_test_seccomp_errno()
 	uid_t id = syscall(EXILE_SYS(getuid));
 
 	int fd = syscall(EXILE_SYS(close), 0);
-	printf("close() return code: %i, errno: %s\n", fd, strerror(errno));
+	LOG("close() return code: %i, errno: %s\n", fd, strerror(errno));
 	return fd == -1 ? 0 : 1;
 }
 
@@ -254,14 +256,14 @@ int test_seccomp_argfilter_mixed()
 	int s = (int) syscall(EXILE_SYS(stat), "/dev/urandom", &statbuf);
 	if(s != -1)
 	{
-		printf("Failed: stat was expected to fail, but returned %i\n", s);
+		LOG("Failed: stat was expected to fail, but returned %i\n", s);
 		return 1;
 	}
 
 	pid_t p = (pid_t) syscall(EXILE_SYS(getpid));
 	if(p != -1)
 	{
-		printf("Failed: getpid was expected to fail, but returned %i\n", p);
+		LOG("Failed: getpid was expected to fail, but returned %i\n", p);
 		return 1;
 	}
 
@@ -269,13 +271,13 @@ int test_seccomp_argfilter_mixed()
 	int ret = (int) syscall(EXILE_SYS(open),t, O_WRONLY);
 	if(ret != -1)
 	{
-		printf("Failed: open was expected to fail, but returned %i\n", ret);
+		LOG("Failed: open was expected to fail, but returned %i\n", ret);
 		return 1;
 	}
 	ret = (int) syscall(EXILE_SYS(open), t, O_RDONLY);
 	if(ret == -1)
 	{
-		printf("Failed: open with O_RDONLY was expected to succeed, but returned %i\n", ret);
+		LOG("Failed: open with O_RDONLY was expected to succeed, but returned %i\n", ret);
 		return 1;
 	}
 	return 0;
@@ -291,13 +293,13 @@ int do_test_seccomp_vow_socket()
 	int s = socket(AF_INET, SOCK_STREAM, 0);
 	if(s == -1)
 	{
-		printf("Failed: socket was expected to succeed, but returned %i\n", s);
+		LOG("Failed: socket was expected to succeed, but returned %i\n", s);
 		return 1;
 	}
 	s = socket(AF_UNIX, SOCK_DGRAM, 0);
 	if(s != -1)
 	{
-		printf("Failed: socket was expected to fail, but returned %i\n", s);
+		LOG("Failed: socket was expected to fail, but returned %i\n", s);
 		return 1;
 	}
 	return 0;
@@ -312,19 +314,19 @@ int do_test_seccomp_vow_open()
 	int ret = open("/dev/urandom", O_WRONLY  | O_APPEND);
 	if(ret != -1)
 	{
-		printf("Failed: open was expected to fail, but returned %i\n", ret);
+		LOG("Failed: open was expected to fail, but returned %i\n", ret);
 		return 1;
 	}
 	ret = open("/dev/urandom", O_RDWR);
 	if(ret != -1)
 	{
-		printf("Failed: open O_RDWR was expected to fail, but returned %i\n", ret);
+		LOG("Failed: open O_RDWR was expected to fail, but returned %i\n", ret);
 		return 1;
 	}
 	ret = open("/dev/urandom", O_RDONLY);
 	if(ret == -1)
 	{
-		printf("Failed: open was expected to succceed, but returned %i\n", ret);
+		LOG("Failed: open was expected to succceed, but returned %i\n", ret);
 		return 1;
 	}
 	return 0;
@@ -335,13 +337,13 @@ int test_seccomp_vow()
 	int ret = test_successful_exit(&do_test_seccomp_vow_open);
 	if(ret != 0)
 	{
-		printf("Failed: do_test_seccomp_vow_open()\n");
+		LOG("Failed: do_test_seccomp_vow_open()\n");
 		return 1;
 	}
 	ret = test_successful_exit(&do_test_seccomp_vow_socket);
 	if(ret != 0)
 	{
-		printf("Failed: do_test_seccomp_vow_socket()\n");
+		LOG("Failed: do_test_seccomp_vow_socket()\n");
 		return 1;
 	}
 	return 0;
@@ -353,13 +355,13 @@ int test_seccomp_exile_vow_multiple()
 	int ret = exile_vow(EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_UNIX | EXILE_SYSCALL_VOW_SECCOMP_INSTALL | EXILE_SYSCALL_VOW_DENY_ERROR);
 	if(ret != 0)
 	{
-		printf("Failed: exile_vow() call 1 failed\n");
+		LOG("Failed: exile_vow() call 1 failed\n");
 		return 1;
 	}
 	int s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s == -1)
 	{
-		printf("Failed: socket was expected to succeed, but returned %i\n", s);
+		LOG("Failed: socket was expected to succeed, but returned %i\n", s);
 		return 1;
 	}
 
@@ -367,13 +369,13 @@ int test_seccomp_exile_vow_multiple()
 	ret = exile_vow(EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_SECCOMP_INSTALL | EXILE_SYSCALL_VOW_DENY_ERROR);
 	if(ret != 0)
 	{
-		printf("Failed: exile_vow() call 2 failed\n");
+		LOG("Failed: exile_vow() call 2 failed\n");
 		return 1;
 	}
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s != -1)
 	{
-		printf("Failed: socket was expected to fail, but returned %i\n", s);
+		LOG("Failed: socket was expected to fail, but returned %i\n", s);
 		return 1;
 	}
 
@@ -381,13 +383,13 @@ int test_seccomp_exile_vow_multiple()
 	ret = exile_vow(EXILE_SYSCALL_VOW_STDIO | EXILE_SYSCALL_VOW_UNIX | EXILE_SYSCALL_VOW_SECCOMP_INSTALL | EXILE_SYSCALL_VOW_DENY_ERROR);
 	if(ret != 0)
 	{
-		printf("Failed: exile_vow() call 3 failed\n");
+		LOG("Failed: exile_vow() call 3 failed\n");
 		return 1;
 	}
 	s = socket(AF_UNIX, SOCK_STREAM, 0);
 	if(s != -1)
 	{
-		printf("Failed: socket was still expected to fail, but returned %i\n", s);
+		LOG("Failed: socket was still expected to fail, but returned %i\n", s);
 		return 1;
 	}
 
@@ -400,7 +402,7 @@ int test_landlock()
 {
 	if(!exile_landlock_is_available())
 	{
-		printf("landlock not available, so cannot test\n");
+		LOG("landlock not available, so cannot test\n");
 		return 1;
 	}
 	struct exile_policy *policy = exile_init_policy();
@@ -449,14 +451,14 @@ int test_nofs()
 	int s = socket(AF_INET,SOCK_STREAM,0);
 	if(s == -1)
 	{
-		fprintf(stderr, "Failed to open socket but this was not requested by policy\n");
+		LOG("Failed to open socket but this was not requested by policy\n");
 		return 1;
 	}
 
 	/* Expect seccomp to take care of this */
 	if(open("/test", O_CREAT | O_WRONLY) >= 0)
 	{
-		fprintf(stderr, "Failed: We do not expect write access\n");
+		LOG("Failed: We do not expect write access\n");
 		return 1;
 	}
 
@@ -472,14 +474,14 @@ int test_no_new_fds()
 
 	if(open("/tmp/test", O_CREAT | O_WRONLY) >= 0)
 	{
-		fprintf(stderr, "Failed: Could open new file descriptor\n");
+		LOG("Failed: Could open new file descriptor\n");
 		return -1;
 	}
 
 	int s = socket(AF_INET,SOCK_STREAM,0);
 	if(s >= 0)
 	{
-		fprintf(stderr, "Failed: socket got opened but policy denied\n");
+		LOG("Failed: socket got opened but policy denied\n");
 		return -1;
 	}
 
@@ -495,13 +497,13 @@ int test_mkpath()
 	int ret = mkpath(filepath,  0700, 1);
 	if(ret != 0)
 	{
-		fprintf(stderr, "Failed: mkpath(file) returned: %i\n", ret);
+		LOG("Failed: mkpath(file) returned: %i\n", ret);
 		return 1;
 	}
 	ret = mkpath(dirpath, 0700, 0);
 	if(ret != 0)
 	{
-		fprintf(stderr, "Failed: mkpath(dirpath) returned: %i\n", ret);
+		LOG("Failed: mkpath(dirpath) returned: %i\n", ret);
 		return 1;
 	}
 
@@ -509,23 +511,23 @@ int test_mkpath()
 	ret = stat(filepath, &statbuf);
 	if(ret != 0)
 	{
-		fprintf(stderr, "Failed: stat on filepath returned: %i\n", ret);
+		LOG("Failed: stat on filepath returned: %i\n", ret);
 		return 1;
 	}
 	if(!S_ISREG(statbuf.st_mode))
 	{
-		fprintf(stderr, "Failed: mkpath did not create a file: %i\n", ret);
+		LOG("Failed: mkpath did not create a file: %i\n", ret);
 		return 1;
 	}
 	ret = stat(dirpath, &statbuf);
 	if(ret != 0)
 	{
-		fprintf(stderr, "Failed: stat on dirpath returned: %i\n", ret);
+		LOG("Failed: stat on dirpath returned: %i\n", ret);
 		return 1;
 	}
 	if(!S_ISDIR(statbuf.st_mode))
 	{
-		fprintf(stderr, "Failed: mkpath did not create a directory: %i\n", ret);
+		LOG("Failed: mkpath did not create a directory: %i\n", ret);
 		return 1;
 	}
 	system("rm -rf /tmp/.exile.h/");
@@ -569,7 +571,7 @@ int test_launch()
 	int launchfd = exile_launch(&params, &res);
 	if(launchfd < 0)
 	{
-		printf("Failed to launch\n");
+		LOG("Failed to launch\n");
 		return 1;
 	}
 
@@ -577,11 +579,11 @@ int test_launch()
 	write(res.write_fd, "1234", 4);
 	int s = read(res.read_fd, buffer, sizeof(buffer)-1);
 	write(1, buffer, s);
-	printf("Before wait, got: %i\n", s);
+	LOG("Before wait, got: %i\n", s);
 	fflush(stdout);
 	if(strstr(buffer, "Echoing: 1234") == NULL)
 	{
-		printf("Failed: Did not get back what we wrote\n");
+		LOG("Failed: Did not get back what we wrote\n");
 	}
 	int status = 0;
 	waitpid(res.tid, &status, __WALL);
@@ -614,12 +616,12 @@ int test_launch_get()
 	unsigned int len = strlen(LAUNCH_GET_TEST_STR);
 	if(n != strlen(LAUNCH_GET_TEST_STR))
 	{
-		printf("Lenght does does not match: %lu vs %u\n", n, len);
+		LOG("Lenght does does not match: %lu vs %u\n", n, len);
 		return 1;
 	}
 	if(strcmp(content, LAUNCH_GET_TEST_STR) != 0)
 	{
-		printf("Received content differs\n");
+		LOG("Received content differs\n");
 		return 1;
 	}
 	return 0;
@@ -631,7 +633,7 @@ int test_vows_from_str()
 	uint64_t actual = exile_vows_from_str("chown wpath inet error");
 	if(expected != actual)
 	{
-		printf("Masks don't match: %lu vs %lu\n", expected, actual);
+		LOG("Masks don't match: %lu vs %lu\n", expected, actual);
 		return 1;
 	}
 	return 0;
