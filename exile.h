@@ -247,7 +247,7 @@ struct syscall_vow_map
 
 struct str_to_vow_map
 {
-	char *str;
+	const char *str;
 	uint64_t value;
 };
 
