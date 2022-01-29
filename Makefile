@@ -3,19 +3,21 @@ bindir = $(prefix)/bin
 CFLAGS = -std=c99 -Wall -Wextra -pedantic
 CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic
 
-.DEFAULT_GOAL := test
+.DEFAULT_GOAL := tests
 
 
 clean:
 	rm -f test testcpp
 
-test: test.c
+test: test.c exile.h
 	$(CC) test.c -g $(CFLAGS) -o test
 
-testcpp: test.cpp
+testcpp: test.cpp exile.h exile.hpp
 	$(CXX) test.cpp -g $(CXXFLAGS) -o testcpp
 
-check: test
+tests: test testcpp
+
+check: tests
 	./test.sh
 
 .PHONY: check
