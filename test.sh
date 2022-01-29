@@ -44,14 +44,15 @@ function runtest_skipped()
 
 function runtest()
 {
-	testname="$1"
-	test_log_file="$2"
+	testbin="$1"
+	testname="$2"
+	test_log_file="$3"
 
 	echo "Running: $testname. Date: $(date)" > "${test_log_file}"
 
-	echo -n "Running $1... "
+	echo -n "Running $testname... "
 	#exit $? to suppress shell message like "./test.sh: line 18: pid Bad system call"
-	(./test $1 || exit $?) &>> "${test_log_file}"
+	(./$testbin "$testname" || exit $?) &>> "${test_log_file}"
 	ret=$?
 	SUCCESS="no"
 	if [ $ret -eq 0 ] ; then
@@ -64,7 +65,7 @@ function runtest()
 		runtest_fail
 	fi
 
-	echo "Finished: ${testname}. Date: $(date). Success: $SUCCESS" >> "${test_log_file}"
+	echo "Finished: ${testname} (${testbin}). Date: $(date). Success: $SUCCESS" >> "${test_log_file}"
 }
 
 GIT_ID=$( git log --pretty="format:%h" -n1 )
@@ -79,7 +80,12 @@ LOG_OUTPUT_DIR_PATH="${LOG_OUTPUT_DIR}/exile_test_${GIT_ID}_${TIMESTAMP}"
 
 for test in $( ./test --dumptests ) ; do
 	testname=$( echo $test )
-	runtest "$testname" "${LOG_OUTPUT_DIR_PATH}/log.${testname}"
+	runtest test "$testname" "${LOG_OUTPUT_DIR_PATH}/log.${testname}"
+done
+
+for test in $( ./testcpp --dumptests ) ; do
+	testname=$( echo $test )
+	runtest testcpp "$testname" "${LOG_OUTPUT_DIR_PATH}/log.${testname}"
 done
 echo
 echo "Tests finished. Logs in $(realpath ${LOG_OUTPUT_DIR_PATH})"
