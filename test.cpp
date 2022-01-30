@@ -35,7 +35,7 @@ int incrementer(int arg)
 int test_exile_launch_trivial()
 {
 	int u = 22;
-	int result = exile_launch_trivial<int>(exile_init_policy(), &incrementer, u);
+	int result = exile_launch<int>(exile_init_policy(), &incrementer, u);
 	assert(result == 23);
 	return 0;
 }
