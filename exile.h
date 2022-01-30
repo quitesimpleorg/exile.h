@@ -698,7 +698,7 @@ uint64_t exile_vows_from_str(const char *str)
 			++str;
 		}
 		int found = 0;
-		for(int i = 0; i < sizeof(str_to_vow_map)/sizeof(str_to_vow_map[0]); i++)
+		for(size_t i = 0; i < sizeof(str_to_vow_map)/sizeof(str_to_vow_map[0]); i++)
 		{
 			if(strcmp(str_to_vow_map[i].str, current) == 0)
 			{
