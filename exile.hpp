@@ -119,7 +119,7 @@ static int do_clone(int (*clonefn)(void *), void *launcharg)
 }
 
 template<typename T, typename U, typename ... Args>
-T exile_launch_trivial(struct exile_policy *policy, U fn, Args && ... args)
+typename std::enable_if_t<std::is_trivially_copyable_v<T>, T> exile_launch(struct exile_policy *policy, U fn, Args && ... args)
 {
 	size_t mapsize = sizeof(T);
 	T * sharedbuf =  (T *) mmap(NULL, mapsize , PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
@@ -145,7 +145,8 @@ T exile_launch_trivial(struct exile_policy *policy, U fn, Args && ... args)
 
 
 template<typename T, typename U, typename ... Args>
-T exile_launch(struct exile_policy *policy, const std::function<size_t (const T &, char *, size_t)> &serializer, const std::function<T(const char *, size_t)> &deserializer, U fn, Args && ... args)
+typename std::enable_if_t<!std::is_trivially_copyable_v<T> && std::is_copy_constructible_v<T>, T>
+	exile_launch(struct exile_policy *policy, const std::function<size_t (const T &, char *, size_t)> &serializer, const std::function<T(const char *, size_t)> &deserializer, U fn, Args && ... args)
 {
 	size_t mapsize = EXILE_MMAP_SIZE;
 	char *sharedbuf =  (char *) mmap(NULL, mapsize , PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
