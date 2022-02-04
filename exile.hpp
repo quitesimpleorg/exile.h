@@ -174,3 +174,26 @@ typename std::enable_if_t<!std::is_trivially_copyable_v<T> && std::is_copy_const
 
 }
 
+template<class T>
+std::basic_string<typename T::value_type> deserialize_stdstring(const char *buf, size_t n)
+{
+	return std::basic_string<typename T::value_type> { buf, n };
+}
+
+template<class T>
+size_t serialize_stdstring(const std::basic_string<typename T::value_type> &t, char *buf, size_t n)
+{
+	if(n < t.size())
+	{
+		return 0;
+	}
+	memcpy(buf, t.data(), t.size());
+	return t.size();
+}
+
+
+template<typename T, typename U, typename ... Args>
+std::basic_string<typename T::value_type> exile_launch(struct exile_policy *policy, U fn, Args && ... args)
+{
+	return exile_launch<T, U, Args...>(policy, &serialize_stdstring<T>, &deserialize_stdstring<T>, fn, std::forward<Args>(args) ...);
+}
