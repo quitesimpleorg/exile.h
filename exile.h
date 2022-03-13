@@ -97,6 +97,11 @@
 //don't mount recursive
 #define EXILE_MOUNT_NOT_REC 1<<5
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 /* Fine-granular approach available with landlock */
 #if HAVE_LANDLOCK == 1
 #define EXILE_FS_ALLOW_REMOVE_DIR		(1 << 7)
@@ -2235,3 +2240,6 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 	*n = size;
 	return result;
 }
+#ifdef __cplusplus
+}
+#endif
