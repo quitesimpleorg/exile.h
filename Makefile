@@ -7,13 +7,17 @@ CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic
 
 
 clean:
-	rm -f test testcpp
+	rm -f test exile.o testcpp
 
-test: test.c exile.h
-	$(CC) test.c exile.c -g $(CFLAGS) -o test
 
-testcpp: test.cpp exile.h exile.hpp
-	$(CXX) test.cpp -g $(CXXFLAGS) -o testcpp
+exile.o: exile.c exile.h
+	$(CC) -c exile.c -g $(CFLAGS) -o exile.o
+
+test: test.c exile.h exile.o
+	$(CC) test.c exile.o -g $(CFLAGS) -o test
+
+testcpp: test.cpp exile.h exile.hpp exile.o
+	$(CXX) test.cpp exile.o -g $(CXXFLAGS) -o testcpp
 
 tests: test testcpp
 
