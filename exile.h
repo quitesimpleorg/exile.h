@@ -497,6 +497,8 @@ struct exile_launch_params
 	struct exile_policy *policy; /* Policy to activate before jumping to func */
 	int (*func)(void *); /* Function to be sandboxed */
 	void *funcarg; /* Arg to be passed */
+	int child_read_pipe[2];
+	int child_write_pipe[2];
 };
 
 struct exile_launch_result
@@ -505,9 +507,6 @@ struct exile_launch_result
 	int read_fd;
 	int write_fd;
 };
-
-static int child_read_pipe[2];
-static int child_write_pipe[2];
 
 int exile_clone_handle(void *arg); 
 /* Helper to easily execute a single function sandboxed.
