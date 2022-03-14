@@ -489,6 +489,7 @@ int test_no_new_fds()
 
 }
 
+extern int mkpath(const char *p, mode_t mode, int baseisfile);
 int test_mkpath()
 {
 	system("rm -rf /tmp/.exile.h/");
