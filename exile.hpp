@@ -89,7 +89,7 @@ int exile_clone_handle_serializer(void * arg)
 	return 0;
 }
 
-static int do_clone(int (*clonefn)(void *), void *launcharg)
+inline int do_clone(int (*clonefn)(void *), void *launcharg)
 {
 	struct rlimit rlimit;
 	int ret = getrlimit(RLIMIT_STACK, &rlimit);
