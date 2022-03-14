@@ -548,12 +548,14 @@ int test_fail_flags()
 	return 0;
 }
 
+
+static int *read_pipe = NULL;
 int do_launch_test(void *arg)
 {
 	int num = *(int *)(arg);
 	num += 1;
 	char buffer[512] = { 0 };
-	read(child_write_pipe[0], buffer, sizeof(buffer)-1);
+	read(*read_pipe, buffer, sizeof(buffer)-1);
 	printf("Sandboxed +1: %i\n", num);
 	printf("Echoing: %s\n", buffer);
 	fflush(stdout);
@@ -569,6 +571,7 @@ int test_launch()
 	params.func = &do_launch_test;
 	params.funcarg = &num;
 	params.policy = policy;
+	read_pipe = &params.child_write_pipe[0];
 	int launchfd = exile_launch(&params, &res);
 	if(launchfd < 0)
 	{

@@ -1702,11 +1702,11 @@ int exile_clone_handle(void *arg)
 	if(ret != 0)
 	{
 		EXILE_LOG_ERROR("Failed to enable policy\n");
-		close(child_read_pipe[1]);
-		close(child_write_pipe[0]);
+		close(params->child_read_pipe[1]);
+		close(params->child_write_pipe[0]);
 		return 1;
 	}
-	ret = dup2(child_read_pipe[1], 1);
+	ret = dup2(params->child_read_pipe[1], 1);
 	if(ret == -1)
 	{
 		EXILE_LOG_ERROR("Failed to redirect stdout to pipe\n");
@@ -1714,8 +1714,8 @@ int exile_clone_handle(void *arg)
 	}
 	ret = params->func(params->funcarg);
 	fclose(stdout);
-	close(child_read_pipe[1]);
-	close(child_write_pipe[0]);
+	close(params->child_read_pipe[1]);
+	close(params->child_write_pipe[0]);
 	return ret;
 }
 
@@ -1733,14 +1733,14 @@ int exile_clone_handle(void *arg)
  * Return value: Negative on error, otherwise the file descriptor to read from*/
 int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_result *launch_result)
 {
-	int ret = pipe(child_read_pipe);
+	int ret = pipe(launch_params->child_read_pipe);
 	if(ret != 0)
 	{
 		EXILE_LOG_ERROR("read pipe creation failed\n");
 		return ret;
 	}
 
-	ret = pipe(child_write_pipe);
+	ret = pipe(launch_params->child_write_pipe);
 	if(ret != 0)
 	{
 		EXILE_LOG_ERROR("write pipe creation failed\n");
@@ -1768,12 +1768,12 @@ int exile_launch(struct exile_launch_params *launch_params, struct exile_launch_
 		EXILE_LOG_ERROR("clone failed(): %s\n", strerror(errno));
 		return ret;
 	}
-	close(child_read_pipe[1]);
-	close(child_write_pipe[0]);
+	close(launch_params->child_read_pipe[1]);
+	close(launch_params->child_write_pipe[0]);
 
 	launch_result->tid = ret;
-	launch_result->read_fd = child_read_pipe[0];
-	launch_result->write_fd = child_write_pipe[1];
+	launch_result->read_fd = launch_params->child_read_pipe[0];
+	launch_result->write_fd = launch_params->child_write_pipe[1];
 	return 0;
 }
 
