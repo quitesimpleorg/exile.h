@@ -10,7 +10,7 @@ clean:
 	rm -f test testcpp
 
 test: test.c exile.h
-	$(CC) test.c -g $(CFLAGS) -o test
+	$(CC) test.c exile.c -g $(CFLAGS) -o test
 
 testcpp: test.cpp exile.h exile.hpp
 	$(CXX) test.cpp -g $(CXXFLAGS) -o testcpp
