@@ -1208,9 +1208,12 @@ static unsigned int exile_flags_to_landlock(unsigned int flags, int statmode)
 		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
 		if(S_ISDIR(statmode))
 		{
-			result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
-			result |= LANDLOCK_ACCESS_FS_MAKE_REG;
 			result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
+			result |= LANDLOCK_ACCESS_FS_REMOVE_FILE;
+			result |= LANDLOCK_ACCESS_FS_MAKE_DIR;
+			result |= LANDLOCK_ACCESS_FS_MAKE_FIFO;
+			result |= LANDLOCK_ACCESS_FS_MAKE_REG;
+			result |= LANDLOCK_ACCESS_FS_MAKE_SOCK;
 			result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
 		}
 	}
