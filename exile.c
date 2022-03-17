@@ -1046,8 +1046,18 @@ static int drop_caps()
 }
 
 
+static void assign_filter(struct sock_filter *left, struct sock_filter *right, struct sock_filter *endfilter)
+{
+	if(left <= endfilter)
+	{
+		*left = *right;
+		return;
+	}
+	EXILE_LOG_ERROR("Too many syscall filters installed! Aborting.\n");
+	abort();
+}
 
-static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, struct sock_filter *filter, unsigned short int *start_index)
+static struct sock_filter *append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, struct sock_filter *filter, struct sock_filter *endfilter)
 {
 	unsigned int action = syscallpolicy->policy;
 	if(action == EXILE_SYSCALL_ALLOW)
@@ -1065,7 +1075,9 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 	long syscall = syscallpolicy->syscall;
 
 	struct sock_filter syscall_load = BPF_STMT(BPF_LD+BPF_W+BPF_ABS, offsetof(struct seccomp_data, nr));
-	filter[(*start_index)++] = 	syscall_load;
+	assign_filter(filter, &syscall_load, endfilter);
+	++filter;
+
 	if(syscall != EXILE_SYSCALL_MATCH_ALL)
 	{
 			/* How many steps forward to jump when we don't match. This is either the last statement,
@@ -1074,11 +1086,11 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 			if(__builtin_add_overflow(next_syscall_pc,  syscallpolicy->argfilterscount, &next_syscall_pc))
 			{
 					EXILE_LOG_ERROR("Overflow while trying to calculate jump offset\n");
-					/* TODO: Return error */
-					return;
+					abort();
 			}
 			struct sock_filter syscall_check = EXILE_BPF_CMP_EQ((unsigned int) syscall, 0, next_syscall_pc);
-			filter[(*start_index)++] = syscall_check;
+			assign_filter(filter, &syscall_check, endfilter);
+			++filter;
 			--next_syscall_pc;
 
 			struct sock_filter return_matching = EXILE_BPF_RETURN_MATCHING;
@@ -1086,8 +1098,8 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 
 			for(size_t i = 0; i < syscallpolicy->argfilterscount; i++)
 			{
-				filter[*start_index] = syscallpolicy->argfilters[i];
-				struct sock_filter *current = &filter[*start_index];
+				assign_filter(filter, &syscallpolicy->argfilters[i], endfilter);
+				struct sock_filter *current = filter;
 				__u8 jump_count_next_syscall = next_syscall_pc;
 				__u8 jump_count_return = jump_count_next_syscall - 1;
 				if(current->jt == EXILE_SYSCALL_EXIT_BPF_NO_MATCH)
@@ -1115,13 +1127,13 @@ static void append_syscall_to_bpf(struct exile_syscall_policy *syscallpolicy, st
 					current->k = jump_count_next_syscall;
 				}
 				--next_syscall_pc;
-				++*start_index;
+				++filter;
 			}
 	}
 	struct sock_filter syscall_action = BPF_STMT(BPF_RET+BPF_K, action);
 	/* TODO: we can do better than adding this below every jump */
-	filter[(*start_index)++] = syscall_action;
-
+	assign_filter(filter, &syscall_action, endfilter);
+	return ++filter;
 }
 
 static int is_valid_syscall_policy(unsigned int policy)
@@ -1149,7 +1161,8 @@ int exile_enable_syscall_policy(struct exile_policy *policy)
 		BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_KILL_PROCESS),
 	};
 
-	unsigned short int current_filter_index = 6;
+	struct sock_filter *current_target = &filter[6];
+	struct sock_filter *end = &filter[1023];
 
 	struct exile_syscall_policy *current_policy = policy->syscall_policies;
 	while(current_policy)
@@ -1159,13 +1172,13 @@ int exile_enable_syscall_policy(struct exile_policy *policy)
 			EXILE_LOG_ERROR("invalid syscall policy specified\n");
 			return -1;
 		}
-		/* TODO: reintroduce overflow checks */
-		append_syscall_to_bpf(current_policy, filter, &current_filter_index);
+		current_target = append_syscall_to_bpf(current_policy, current_target, end);
 		current_policy = current_policy->next;
 	}
 
+	unsigned short len = (current_target - &filter[0]);
 	struct sock_fprog prog = {
-		.len = current_filter_index ,
+		.len = len ,
 		.filter = filter,
 	};
 
