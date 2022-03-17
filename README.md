@@ -6,17 +6,124 @@ The following section gives small quick examples. Then the motivation is explain
 Proper API documentation will be maintained in other files.
 
 ## Quick demo
-TODO This section will demonstrate the simplicity of the API, but only serves as an overview.
+This section quickly demonstrates the simplicity of the API. It serves as an overview to get
+a first impression.
+
+system() is used to keep the example C code short. It also demonstrates that subprocesses are also subject to restrictions imposed by exile.h.
 
 ### Filesystem isolation
+```c
+#include "exile.h"
+#include <assert.h>
+int main(void)
+{
+	system("echo test > /home/user/testfile");
+	struct exile_policy *policy = exile_init_policy();
+	exile_append_path_policies(policy, EXILE_FS_ALLOW_ALL_READ, "/home/user");
+	exile_append_path_policies(policy, EXILE_FS_ALLOW_ALL_READ | EXILE_FS_ALLOW_ALL_WRITE, "/tmp");
+	int ret = exile_enable_policy(policy);
+	if(ret != 0)
+	{
+		exit(EXIT_FAILURE);
+	}
+	int fd = open("/home/user/test", O_CREAT | O_WRONLY | O_TRUNC, 0600);
+	assert(fd == -1);
+	fd = open("/home/user/testfile", O_RDONLY);
+	//use fd
+	assert(fd != -1);
+	fd = open("/tmp/testfile", O_CREAT | O_WRONLY | O_TRUNC, 0600);
+	//use fd
+	assert(fd != -1);
+	return 0;
+}
+```
 
+The assert() calls won't be fired, consistent with the policy.
 
+### System call policies / vows`
+exile.h allows specifying which syscalls are permitted or denied. In the folloing example,
+ls is never executed, as the specificed "vows" do not allow the execve system call. The
+process will be killed.
 
-### System call policies / vows
+```c
+#include "exile.h"
 
+int main(void)
+{
+	struct exile_policy *policy = exile_init_policy();
+	policy->vow_promises = exile_vows_from_str("stdio rpath wpath cpath");
+	exile_enable_policy(policy);
+	printf("Trying to execute...");
+	execlp("/bin/ls", "ls", "/", NULL);
+}
+```
+
+### Isolation from network
+exile offers a quick way to isolate a process from the default network namespace.
+
+```c
+#include "exile.h"
+
+int main(void)
+{
+	struct exile_policy *policy = exile_init_policy();
+	policy->namespace_options |= EXILE_UNSHARE_NETWORK;
+	int ret = exile_enable_policy(policy);
+	if(ret != 0)
+	{
+		exit(EXIT_FAILURE);
+	}
+	system("curl -I https://evil.tld");
+}
+```
+Produces ```curl: (6) Could not resolve host: evil.tld```. For example, this is useful for subprocesses which do not need
+network access, but perform tasks such as parsing user-supplied file formats.
 
 ### Isolation of single functions
-exile_launch() demo
+Currently, working is being done to enable to quickly isolate individual function calls.
+
+Consider the following C++ code:
+```cpp
+#include <iostream>
+#include <fstream>
+#include "exile.hpp"
+std::string cat(std::string path)
+{
+	std::fstream f1;
+	f1.open(path.c_str(), std::ios::in);
+	std::string content;
+	std::string line;
+	while(getline(f1, line)) {
+		content += line + "\n";
+	}
+	return content;
+}
+
+int main(void)
+{
+	struct exile_policy *policy = exile_init_policy();
+	policy->vow_promises = exile_vows_from_str("stdio rpath");
+
+	std::string content = exile_launch<std::string>(policy, cat, "/etc/hosts");
+	std::cout << content;
+
+	policy = exile_init_policy();
+	policy->vow_promises = exile_vows_from_str("stdio");
+
+	try
+	{
+	content = exile_launch<std::string>(policy, cat, "/etc/hosts");
+	std::cout << content;
+	}
+	catch(std::exception &e)
+	{
+		std::cout << "launch failure: " << e.what() << std::endl;
+	}
+}
+```
+
+We execute "cat()". The first call succeeds. In the second, we get an exception, because
+the subprocess "cat()" was launched in violated the policy (missing "rpath" vow).
 
 ## Status
 No release yet, experimental, API is unstable, builds will break on updates of this library.
