@@ -430,6 +430,7 @@ int get_vow_argfilter(long syscall, uint64_t vow_promises, struct sock_filter *f
 
 	struct exile_syscall_filter ioctl_filter[] = {
 		EXILE_SYSCALL_FILTER_LOAD_ARG(1),
+		{ EXILE_SYSCALL_VOW_IOCTL, EXILE_BPF_NO_MATCH_SET(TIOCSTI), 1 },
 		{ EXILE_SYSCALL_VOW_IOCTL, EXILE_BPF_RETURN_MATCHING, 1 },
 		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIONREAD), 1},
 		{ EXILE_SYSCALL_VOW_STDIO, EXILE_BPF_MATCH(FIONBIO), 1},
