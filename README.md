@@ -184,7 +184,7 @@ TODO:
 ## Requirements
 Kernel >=3.17
 
-While mostly transparent to users of this API, kernel >= 5.13 is required to take advantage of Landlock and furthermore it depends on distro-provided kernels being reasonable and enabling it by default. In practise, this means that Landlock probably won't be used for now, and exile.h will use a combination of namespaces, bind mounts and chroot as fallbacks.
+While mostly transparent to users of this API, kernel >= 5.13 is required to take advantage of Landlock. Furthermore, it depends on distro-provided kernels being reasonable and enabling it by default. In practise, this means that Landlock probably won't be used for now, and exile.h will use a combination of namespaces, bind mounts and chroot as fallbacks.
 
 
 ## FAQ
@@ -194,11 +194,11 @@ While mostly transparent to users of this API, kernel >= 5.13 is required to tak
 
 No.
 
-### It doesn't work on Debian!
-
-You can thank a Debian-specific kernel patch for that. In the future,
-the library may check against that. Execute
+### It doesn't work on my Debian version!
+You can thank a Debian-specific kernel patch for that. Execute
 `echo 1 > /proc/sys/kernel/unprivileged_userns_clone` to disable that patch for now.
+
+Note that newer releases should not cause this problem any longer, as [explained](https://www.debian.org/releases/bullseye/amd64/release-notes/ch-information.en.html#linux-user-namespaces) in the Debian release notes.
 
 ### Examples
   - looqs: https://gitea.quitesimple.org/crtxcr/looqs
