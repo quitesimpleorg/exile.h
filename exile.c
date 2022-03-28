@@ -643,7 +643,7 @@ int (exile_append_path_policies)(struct exile_policy *exile_policy, unsigned int
 		int fd = open(path, O_PATH);
 		if(fd == -1)
 		{
-			EXILE_LOG_ERROR("Failed to open the specified path: %s\n", strerror(errno));
+			EXILE_LOG_ERROR("Failed to open %s: %s\n", path, strerror(errno));
 			exile_policy->exile_flags |= EXILE_FLAG_ADD_PATH_POLICY_FAIL;
 			return -1;
 		}
@@ -851,7 +851,7 @@ static int create_chroot_dirs(const char *chroot_target_path, struct exile_path_
 		ret = mkpath(path_inside_chroot, 0700, baseisfile);
 		if(ret < 0)
 		{
-			EXILE_LOG_ERROR("Error creating directory structure while mounting paths to chroot. %s\n", strerror(errno));
+			EXILE_LOG_ERROR("Error creating directory structure %s while mounting paths to chroot: %s\n", path_inside_chroot, strerror(errno));
 			free(path_inside_chroot);
 			return ret;
 		}
@@ -1350,7 +1350,7 @@ static int check_policy_sanity(struct exile_policy *policy)
 		{
 			if(path_policy_needs_landlock(path_policy))
 			{
-				EXILE_LOG_ERROR("A path policy needs landlock, but landlock is not available. Fallback not possible\n");
+				EXILE_LOG_ERROR("A path policy (%s) needs landlock, but landlock is not available. Fallback not possible\n", path_policy->path);
 				return -1;
 			}
 			path_policy = path_policy->next;
