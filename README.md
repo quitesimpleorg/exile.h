@@ -1,8 +1,8 @@
 # exile.h
-`exile.h` is a header-only library, enabling processes to easily isolate themselves on Linux for exploit mitigation. exile.h wants to make existing technologies, such as Seccomp and Linux Namespaces, easier to use. Those generally
+`exile.h` is a header-only library, enabling processes to easily isolate themselves on Linux for exploit mitigation purposes. exile.h wants to make existing technologies, such as Seccomp and Linux Namespaces, easier to use. Those generally
 require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
 
-The following section gives small quick examples. Then the motivation is explained in more detail.
+The following section offers small examples. Then the motivation is explained in more detail.
 Proper API documentation will be maintained in other files.
 
 ## Quick demo
@@ -10,6 +10,8 @@ This section quickly demonstrates the simplicity of the API. It serves as an ove
 a first impression.
 
 system() is used to keep the example C code short. It also demonstrates that subprocesses are also subject to restrictions imposed by exile.h.
+
+While the example show different features separately, it is generally possible to combine those.
 
 ### Filesystem isolation
 ```c
@@ -40,9 +42,9 @@ int main(void)
 
 The assert() calls won't be fired, consistent with the policy.
 
-### System call policies / vows`
+### System call policies / vows
 exile.h allows specifying which syscalls are permitted or denied. In the folloing example,
-ls is never executed, as the specificed "vows" do not allow the execve system call. The
+ls is never executed, as the specificed "vows" do not allow the execve() system call. The
 process will be killed.
 
 ```c
@@ -80,7 +82,7 @@ Produces ```curl: (6) Could not resolve host: evil.tld```. For example, this is 
 network access, but perform tasks such as parsing user-supplied file formats.
 
 ### Isolation of single functions
-Currently, working is being done to enable to quickly isolate individual function calls.
+Currently, work is being done that hopefully will allow isolation of individual function calls in a mostly pain-free manner.
 
 Consider the following C++ code:
 ```cpp
@@ -123,7 +125,10 @@ int main(void)
 ```
 
 We execute "cat()". The first call succeeds. In the second, we get an exception, because
-the subprocess "cat()" was launched in violated the policy (missing "rpath" vow).
+the subprocess "cat()" was launched in violated the policy (missing "rpath" vow). 
+
+Naturally, there is a performance overhead. Certain challenges such pass-by-reference
+are yet to be solved.
 
 ## Status
 No release yet, experimental, API is unstable, builds will break on updates of this library.
@@ -133,7 +138,7 @@ Currently, it's mainly evolving from the needs of my other projects.
 ## Motivation and Background
 exile.h unlocks existing Linux mechanisms to facilite isolation of processes from resources. Limiting the scope of what programs can do helps defending the rest of the system when a process gets under attacker's control (when classic mitigations such as ASLR etc. failed). To this end, OpenBSD has the pledge() and unveil() functions available. Those functions are helpful mitigation mechanisms, but such accessible ways are unfortunately not readily available on Linux. This is where exile.h steps in.
 
-Seccomp allows to restrict system calls available to a process and thus decrease the systems attack surface, but it generally is not easy to use. Requiring BPF filter instructions, you generally just can't make use of it right away. exile.h provides an API inspired by pledge(), building on top of seccomp. It also provides an interface to manually restrict the system calls that can be issued.
+Seccomp allows restricting the system calls available to a process and thus decrease the systems attack surface, but it generally is not easy to use. Requiring BPF filter instructions, you generally just can't make use of it right away. exile.h provides an API inspired by pledge(), building on top of seccomp. It also provides an interface to manually restrict the system calls that can be issued.
 
 Traditional methods employed to restrict file system access, like different uids/gids, chroot, bind-mounts, namespaces etc. may require administrator intervention, are perhaps only suitable
 for daemons and not desktop applications, or are generally rather involved. As a positive example, Landlock since 5.13  is a vast improvement to limit file system access of processes. It also greatly simplifies exile.h' implementation of fs isolation.
@@ -159,9 +164,8 @@ Way more examples can be given, but we can put it in simple words: A general pur
 
 
 ## What it's not
-A way for end users/administrators to restrict processes. In the future, a wrapper binary may be available to achieve this, but it generally aims for developers to bring sandboxing/isolation into their software, like web browsers do. This allows a more fine-grained approach, as the developers
-is more familiar with the software. Applying restrictions with solutions like AppArmor requires
-them to be present on the system and it's easy to break things this way.
+A way for end users/administrators to restrict processes. In the future, a wrapper binary may be available to achieve this, but it generally aims for developers to bring sandboxing/isolation into their software. This allows a more fine-grained approach, as the developers are more familiar with their software. Applying restrictions with solutions like AppArmor requires
+them to be present and installed on the system and it's easy to break things this way.
 
 Therefore, software should ideally be written with sandboxing in mind from the beginning.
 
@@ -200,7 +204,7 @@ You can thank a Debian-specific kernel patch for that. Execute
 
 Note that newer releases should not cause this problem any longer, as [explained](https://www.debian.org/releases/bullseye/amd64/release-notes/ch-information.en.html#linux-user-namespaces) in the Debian release notes.
 
-### Examples
+### Real-world usage
   - looqs: https://gitea.quitesimple.org/crtxcr/looqs
   - qswiki: https://gitea.quitesimple.org/crtxcr/qswiki
 
