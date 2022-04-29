@@ -127,8 +127,11 @@ int main(void)
 We execute "cat()". The first call succeeds. In the second, we get an exception, because
 the subprocess "cat()" was launched in violated the policy (missing "rpath" vow). 
 
-Naturally, there is a performance overhead. Certain challenges such pass-by-reference
-are yet to be solved.
+Naturally, there is a performance overhead. Certain challenges remain, such as the fact
+that being executed in a subprocess, we operate on copies, so handling references
+is not something that has been given much thought. There is also the fact
+that clone()ing from threads opens a can of worms. Hence, exile_launch()
+is best avoided in multi-threaded contexts.
 
 ## Status
 No release yet, experimental, API is unstable, builds will break on updates of this library.
