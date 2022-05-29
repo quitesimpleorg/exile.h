@@ -100,6 +100,7 @@ inline int do_clone(int (*clonefn)(void *), void *launcharg)
 	}
 	size_t size = rlimit.rlim_cur;
 	char *stack = (char *) calloc(1, size);
+	char *stackbegin = stack;
 	if(stack == NULL)
 	{
 		EXILE_LOG_ERROR("Failed to allocate stack memory for child\n");
@@ -110,6 +111,7 @@ inline int do_clone(int (*clonefn)(void *), void *launcharg)
 	ret = clone(clonefn, stack, 17 /* SIGCHLD */, launcharg);
 	int status = 0;
 	waitpid(ret, &status, __WALL);
+	free(stackbegin);
 	if(WIFEXITED(status))
 	{
 		return WEXITSTATUS(status);
