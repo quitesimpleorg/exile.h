@@ -75,6 +75,7 @@
 #define EXILE_UNSHARE_NETWORK 1<<1
 #define EXILE_UNSHARE_USER 1<<2
 #define EXILE_UNSHARE_MOUNT 1<<3
+#define EXILE_UNSHARE_AUTOMATIC 1<<4
 
 #ifndef EXILE_LOG_ERROR
 #define EXILE_LOG_ERROR(...) do { fprintf(stderr, "exile.h: %s(): Error: ", __func__); fprintf(stderr, __VA_ARGS__); } while(0)
@@ -273,6 +274,7 @@ struct exile_path_policy
 #define EXILE_SYSCALL_ALLOW 1
 #define EXILE_SYSCALL_DENY_KILL_PROCESS 2
 #define EXILE_SYSCALL_DENY_RET_ERROR 3
+#define EXILE_SYSCALL_DENY_RET_NOSYS 4
 
 #define EXILE_BPF_NOP \
 BPF_STMT(BPF_JMP+BPF_JA,0)

@@ -643,6 +643,24 @@ int test_vows_from_str()
 	return 0;
 }
 
+int test_clone3_nosys()
+{
+	struct exile_policy *policy = exile_init_policy();
+	policy->vow_promises = exile_vows_from_str("stdio rpath wpath cpath thread error");
+
+	exile_enable_policy(policy);
+	/* While args are invalid, it should never reach clone3 syscall handler, so it's irrelevant for
+	 our test*/
+	long ret =  syscall(__NR_clone3, NULL, 0);
+
+	if(ret == -1 && errno != ENOSYS)
+	{
+		LOG("clone3() was not allowed but did not return ENOSYS. It returned: %li, errno: %i\n", ret, errno);
+		return 1;
+	}
+	return 0;
+}
+
 struct dispatcher
 {
 	char *name;
@@ -670,6 +688,7 @@ struct dispatcher dispatchers[] = {
 	{ "launch", &test_launch},
 	{ "launch-get", &test_launch_get},
 	{ "vow_from_str", &test_vows_from_str},
+	{ "clone3_nosys", &test_clone3_nosys},
 };
 
 int main(int argc, char *argv[])

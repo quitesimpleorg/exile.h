@@ -280,7 +280,7 @@ static struct syscall_vow_map exile_vow_map[] =
 	{EXILE_SYS(copy_file_range), EXILE_SYSCALL_VOW_STDIO},
 	{EXILE_SYS(statx), EXILE_SYSCALL_VOW_RPATH},
 	{EXILE_SYS(rseq), EXILE_SYSCALL_VOW_THREAD},
-	{EXILE_SYS(clone3), EXILE_SYSCALL_VOW_CLONE},
+	{EXILE_SYS(clone3), EXILE_SYSCALL_VOW_CLONE|EXILE_SYSCALL_VOW_THREAD},
 	{EXILE_SYS(close_range), EXILE_SYSCALL_VOW_STDIO},
 	{EXILE_SYS(openat2), EXILE_SYSCALL_VOW_RPATH|EXILE_SYSCALL_VOW_WPATH},
 	{EXILE_SYS(faccessat2), EXILE_SYSCALL_VOW_RPATH},
@@ -521,7 +521,7 @@ int get_vow_argfilter(long syscall, uint64_t vow_promises, struct sock_filter *f
 			current_count = COUNT_EXILE_SYSCALL_FILTER(open_filter);
 			break;
 		case EXILE_SYS(openat2):
-			*policy = EXILE_SYSCALL_DENY_RET_ERROR;
+			*policy = EXILE_SYSCALL_DENY_RET_NOSYS;
 			return 0;
 			break;
 		case EXILE_SYS(socket):
@@ -539,7 +539,7 @@ int get_vow_argfilter(long syscall, uint64_t vow_promises, struct sock_filter *f
 		case EXILE_SYS(clone3):
 			if((vow_promises & EXILE_SYSCALL_VOW_CLONE) == 0)
 			{
-				*policy = EXILE_SYSCALL_DENY_RET_ERROR;
+				*policy = EXILE_SYSCALL_DENY_RET_NOSYS;
 				return 0;
 			}
 			break;
@@ -1075,6 +1075,10 @@ static struct sock_filter *append_syscall_to_bpf(struct exile_syscall_policy *sy
 	{
 		action = SECCOMP_RET_ERRNO|EACCES;
 	}
+	if(action == EXILE_SYSCALL_DENY_RET_NOSYS)
+	{
+		action = SECCOMP_RET_ERRNO|ENOSYS;
+	}
 	long syscall = syscallpolicy->syscall;
 
 	struct sock_filter syscall_load = BPF_STMT(BPF_LD+BPF_W+BPF_ABS, offsetof(struct seccomp_data, nr));
@@ -1141,7 +1145,7 @@ static struct sock_filter *append_syscall_to_bpf(struct exile_syscall_policy *sy
 
 static int is_valid_syscall_policy(unsigned int policy)
 {
-	return policy == EXILE_SYSCALL_ALLOW || policy == EXILE_SYSCALL_DENY_RET_ERROR || policy == EXILE_SYSCALL_DENY_KILL_PROCESS;
+	return policy == EXILE_SYSCALL_ALLOW || policy == EXILE_SYSCALL_DENY_RET_ERROR || policy == EXILE_SYSCALL_DENY_KILL_PROCESS || policy == EXILE_SYSCALL_DENY_RET_NOSYS;
 }
 
 /*
