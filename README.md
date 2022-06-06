@@ -11,7 +11,7 @@ a first impression.
 
 system() is used to keep the example C code short. It also demonstrates that subprocesses are also subject to restrictions imposed by exile.h.
 
-While the example show different features separately, it is generally possible to combine those.
+While the examples show different features separately, it is generally possible to combine those.
 
 ### Filesystem isolation
 ```c
@@ -43,8 +43,8 @@ int main(void)
 The assert() calls won't be fired, consistent with the policy.
 
 ### System call policies / vows
-exile.h allows specifying which syscalls are permitted or denied. In the folloing example,
-ls is never executed, as the specificed "vows" do not allow the execve() system call. The
+exile.h allows specifying which syscalls are permitted or denied. In the following example,
+ls is never executed, as the specified "vows" do not allow the execve() system call. The
 process will be killed.
 
 ```c
@@ -130,7 +130,7 @@ the subprocess "cat()" was launched in violated the policy (missing "rpath" vow)
 Naturally, there is a performance overhead. Certain challenges remain, such as the fact
 that being executed in a subprocess, we operate on copies, so handling references
 is not something that has been given much thought. There is also the fact
-that clone()ing from threads opens a can of worms. Hence, exile_launch()
+that clone()ing from threads opens a can of worms, particularly with locks. Hence, exile_launch()
 is best avoided in multi-threaded contexts.
 
 ## Status
@@ -139,7 +139,7 @@ No release yet, experimental, API is unstable, builds will break on updates of t
 Currently, it's mainly evolving from the needs of my other projects.
 
 ## Motivation and Background
-exile.h unlocks existing Linux mechanisms to facilite isolation of processes from resources. Limiting the scope of what programs can do helps defending the rest of the system when a process gets under attacker's control (when classic mitigations such as ASLR etc. failed). To this end, OpenBSD has the pledge() and unveil() functions available. Those functions are helpful mitigation mechanisms, but such accessible ways are unfortunately not readily available on Linux. This is where exile.h steps in.
+exile.h unlocks existing Linux mechanisms to facilitate isolation of processes from resources. Limiting the scope of what programs can do helps defending the rest of the system when a process gets under attacker's control (when classic mitigations such as ASLR etc. failed). To this end, OpenBSD has the pledge() and unveil() functions available. Those functions are helpful mitigation mechanisms, but such accessible ways are unfortunately not readily available on Linux. This is where exile.h steps in.
 
 Seccomp allows restricting the system calls available to a process and thus decrease the systems attack surface, but it generally is not easy to use. Requiring BPF filter instructions, you generally just can't make use of it right away. exile.h provides an API inspired by pledge(), building on top of seccomp. It also provides an interface to manually restrict the system calls that can be issued.
 
@@ -148,19 +148,9 @@ for daemons and not desktop applications, or are generally rather involved. As a
 
 Abstracting those details may help developers bring sandboxing into their applications.
 
-## Example: Archive extraction
-A programming uncompressing archives does not need network access, but should a bug allow code execution, obviously the payload may also access the network. Once the target path is known, it doesn't need access to the whole file system, only write-permissions to the target directory and read on the archive file(s).
-
-TODO example with exile.h applied on "tar" or "unzip". Link to repo.
-
-## Example: Web apps
-Those generally don't need access to the whole filesystem hierarchy, nor do they necessarily require the ability to execute other processes.
-
-Way more examples can be given, but we can put it in simple words: A general purpose OS allow a process to do more things than it actually needs to do.
-
 ## Features
   - Restricting file system access (using Landlock or Namespaces/chroot as fallback)
-  - Systemcall filtering (using seccomp-bpf). An interface inspired by OpenBSD's pledge() is available, removing the need to specifc rules for syscalls.
+  - Systemcall filtering (using seccomp-bpf). An interface inspired by OpenBSD's pledge() is available
   - Dropping privileges in general, such as capabilities
   - Isolating the application from the network, etc. through Namespaces
   - Helpers to isolate single functions
@@ -197,7 +187,7 @@ While mostly transparent to users of this API, kernel >= 5.13 is required to tak
 ## FAQ
 
 
-### Does the process need to be priviliged to utilize the library?
+### Does the process need to be privileged to utilize the library?
 
 No.
 
@@ -214,6 +204,9 @@ Note that newer releases should not cause this problem any longer, as [explained
 Outdated:
   - cgit sandboxed: https://gitea.quitesimple.org/crtxcr/cgitsb
   - qpdfviewsb sandboxed (quick and dirty): https://gitea.quitesimple.org/crtxcr/qpdfviewsb
+
+### Other projects
+ - [sandbox2](https://developers.google.com/code-sandboxing/sandbox2/)
 
 
 ### Contributing
