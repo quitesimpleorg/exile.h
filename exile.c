@@ -1410,6 +1410,11 @@ static int check_policy_sanity(struct exile_policy *policy)
 		{
 			if(syscall_policy->syscall == EXILE_SYSCALL_MATCH_ALL)
 			{
+				if(policy->vow_promises != 0)
+				{
+					EXILE_LOG_ERROR("It's not possible to specify a default, all matching syscall policy while also using vows\n");
+					return -1;
+				}
 				last_match_all = i;
 				match_all_policy = syscall_policy->policy;
 			}
@@ -1420,7 +1425,7 @@ static int check_policy_sanity(struct exile_policy *policy)
 			syscall_policy = syscall_policy->next;
 			++i;
 		}
-		if(last_match_all == -1 || i - last_match_all != 1)
+		if(policy->vow_promises == 0 && (last_match_all == -1 || i - last_match_all != 1))
 		{
 			EXILE_LOG_ERROR("The last entry in the syscall policy list must match all syscalls (default rule)\n");
 			return -1;
