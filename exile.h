@@ -364,6 +364,7 @@ struct exile_policy
 	int no_new_privs;
 	int no_fs;
 	int no_new_fds;
+	int keep_fds_open;
 	int namespace_options;
 	int disable_syscall_filter;
 	/* Bind mounts all paths in path_policies into the chroot and applies

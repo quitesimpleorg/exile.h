@@ -388,10 +388,10 @@ int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall,
 		newpolicy->argfilters[i] = argfilters[i];
 	}
 	newpolicy->next = NULL;
-	
+
 	*(exile_policy->syscall_policies_tail) = newpolicy;
 	exile_policy->syscall_policies_tail = &(newpolicy->next);
-	
+
 	exile_policy->disable_syscall_filter = 0;
 	return 0;
 }
@@ -1446,7 +1446,20 @@ static void close_file_fds()
 	long max_files = sysconf(_SC_OPEN_MAX);
 	for(long i = 3; i <= max_files; i++)
 	{
-		close((int)i);
+		struct stat statbuf;
+		int fd = (int) max_files;
+		int result = fstat(i, &statbuf);
+		if(result == -1 && errno != EBADF && errno != EACCES)
+		{
+			EXILE_LOG_ERROR("Could not fstat %i: %s\n", fd, strerror(errno));
+			abort();
+		}
+		int type = statbuf.st_mode & S_IFMT;
+		if(type != S_IFIFO && type != S_IFSOCK)
+		{
+			/* No error check, retrying not recommended */
+			close(fd);
+		}
 	}
 }
 
@@ -1507,6 +1520,11 @@ int exile_enable_policy(struct exile_policy *policy)
 	{
 		EXILE_LOG_ERROR("Policy sanity check failed. Cannot apply policy!\n");
 		return -EINVAL;
+	}
+
+	if(policy->keep_fds_open != 1)
+	{
+		close_file_fds();
 	}
 
 	if(enter_namespaces(policy->namespace_options) < 0)
