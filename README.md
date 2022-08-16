@@ -1,6 +1,5 @@
 # exile.h
-`exile.h` is a header-only library, enabling processes to easily isolate themselves on Linux for exploit mitigation purposes. exile.h wants to make existing technologies, such as Seccomp and Linux Namespaces, easier to use. Those generally
-require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
+`exile.h` provides an API for processes on Linux to easily isolate themselves for exploit mitigation purposes. exile.h makes it simpler for developers to use existing technologies  such as Seccomp and Linux Namespaces. Those generally require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
 
 The following section offers small examples. Then the motivation is explained in more detail.
 Proper API documentation will be maintained in other files.
@@ -44,7 +43,7 @@ The assert() calls won't be fired, consistent with the policy.
 
 ### System call policies / vows
 exile.h allows specifying which syscalls are permitted or denied. In the following example,
-ls is never executed, as the specified "vows" do not allow the execve() system call. The
+'ls' is never executed, as the specified "vows" do not allow the execve() system call. The
 process will be killed.
 
 ```c
@@ -136,7 +135,7 @@ is best avoided in multi-threaded contexts.
 ## Status
 No release yet, experimental, API is unstable, builds will break on updates of this library.
 
-Currently, it's mainly evolving from the needs of my other projects.
+Currently, it's mainly evolving from the needs of my other projects which use exile.h.
 
 ## Motivation and Background
 exile.h unlocks existing Linux mechanisms to facilitate isolation of processes from resources. Limiting the scope of what programs can do helps defending the rest of the system when a process gets under attacker's control (when classic mitigations such as ASLR etc. failed). To this end, OpenBSD has the pledge() and unveil() functions available. Those functions are helpful mitigation mechanisms, but such accessible ways are unfortunately not readily available on Linux. This is where exile.h steps in.
@@ -144,7 +143,7 @@ exile.h unlocks existing Linux mechanisms to facilitate isolation of processes f
 Seccomp allows restricting the system calls available to a process and thus decrease the systems attack surface, but it generally is not easy to use. Requiring BPF filter instructions, you generally just can't make use of it right away. exile.h provides an API inspired by pledge(), building on top of seccomp. It also provides an interface to manually restrict the system calls that can be issued.
 
 Traditional methods employed to restrict file system access, like different uids/gids, chroot, bind-mounts, namespaces etc. may require administrator intervention, are perhaps only suitable
-for daemons and not desktop applications, or are generally rather involved. As a positive example, Landlock since 5.13  is a vast improvement to limit file system access of processes. It also greatly simplifies exile.h' implementation of fs isolation.
+for daemons and not desktop applications, or are generally rather involved. As a positive example, Landlock since 5.13 is a vast improvement to limit file system access of processes. It also greatly simplifies exile.h' implementation of fs isolation.
 
 Abstracting those details may help developers bring sandboxing into their applications.
 
@@ -181,7 +180,7 @@ TODO:
 ## Requirements
 Kernel >=3.17
 
-While mostly transparent to users of this API, kernel >= 5.13 is required to take advantage of Landlock. Furthermore, it depends on distro-provided kernels being reasonable and enabling it by default. In practise, this means that Landlock probably won't be used for now, and exile.h will use a combination of namespaces, bind mounts and chroot as fallbacks.
+While mostly transparent to users of this API, kernel >= 5.13 is required to take advantage of Landlock. Furthermore, it depends on distro-provided kernels being reasonable and enabling it by default. In practise, Landlock maybe won't be used in some cases so exile.h will use a combination of namespaces, bind mounts and chroot as fallbacks.
 
 
 ## FAQ
@@ -198,7 +197,7 @@ You can thank a Debian-specific kernel patch for that. Execute
 Note that newer releases should not cause this problem any longer, as [explained](https://www.debian.org/releases/bullseye/amd64/release-notes/ch-information.en.html#linux-user-namespaces) in the Debian release notes.
 
 ### Real-world usage
-  - looqs: https://gitea.quitesimple.org/crtxcr/looqs
+  - looqs: https://github.com/quitesimpleorg/looqs
   - qswiki: https://gitea.quitesimple.org/crtxcr/qswiki
 
 Outdated:
