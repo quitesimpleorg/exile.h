@@ -361,10 +361,11 @@ inline int exile_landlock_is_available()
 {
 	#if HAVE_LANDLOCK == 1
 	int ruleset = landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
-	return ruleset == 1;
+	return ruleset > 0;
 	#endif
 	return 0;
 }
+
 int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall, unsigned int syscall_policy, struct sock_filter *argfilters, size_t n)
 {
 	struct exile_syscall_policy *newpolicy = (struct exile_syscall_policy *) calloc(1, sizeof(struct exile_syscall_policy));
