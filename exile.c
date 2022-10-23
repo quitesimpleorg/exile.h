@@ -382,6 +382,7 @@ int exile_append_syscall_policy(struct exile_policy *exile_policy, long syscall,
 	{
 		EXILE_LOG_ERROR("Too many argfilters supplied\n");
 		exile_policy->exile_flags |= EXILE_FLAG_ADD_SYSCALL_POLICY_FAIL;
+		free(newpolicy);
 		return -1;
 	}
 	for(size_t i = 0; i < n; i++)
