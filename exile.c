@@ -870,18 +870,18 @@ static int perform_mounts(const char *chroot_target_path, struct exile_path_poli
 {
 	while(path_policy != NULL)
 	{
-		int mount_flags = get_policy_mount_flags(path_policy);
-
-		char *path_inside_chroot = concat_path(chroot_target_path, path_policy->path);
-		if(path_inside_chroot == NULL)
-		{
-			return 1;
-		}
-		//all we do is bind mounts
-		mount_flags |= MS_BIND;
-
 		if(path_policy->policy & EXILE_FS_ALLOW_ALL_READ || path_policy->policy & EXILE_FS_ALLOW_ALL_WRITE)
 		{
+			int mount_flags = get_policy_mount_flags(path_policy);
+
+			char *path_inside_chroot = concat_path(chroot_target_path, path_policy->path);
+			if(path_inside_chroot == NULL)
+			{
+				return 1;
+			}
+			//all we do is bind mounts
+			mount_flags |= MS_BIND;
+
 			int ret = mount(path_policy->path, path_inside_chroot,  NULL, mount_flags, NULL);
 			if(ret < 0 )
 			{
@@ -898,9 +898,10 @@ static int perform_mounts(const char *chroot_target_path, struct exile_path_poli
 				free(path_inside_chroot);
 				return ret;
 			}
-			path_policy = path_policy->next;
+
 			free(path_inside_chroot);
 		}
+		path_policy = path_policy->next;
 	}
 	return 0;
 }
