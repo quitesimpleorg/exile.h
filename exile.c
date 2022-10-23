@@ -816,11 +816,13 @@ char *concat_path(const char *first, const char *second)
 	if(written < 0)
 	{
 		EXILE_LOG_ERROR("Error during path concatination\n");
+		free(result);
 		return NULL;
 	}
 	if(written >= PATH_MAX)
 	{
 		EXILE_LOG_ERROR("path concatination truncated\n");
+		free(result);
 		return NULL;
 	}
 	return result;
