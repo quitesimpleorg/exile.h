@@ -1,12 +1,12 @@
 # exile.h
-`exile.h` provides an API for processes on Linux to easily isolate themselves for exploit mitigation purposes. exile.h makes it simpler for developers to use existing technologies  such as Seccomp and Linux Namespaces. Those generally require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
+`exile.h` provides an API for processes on Linux to easily isolate themselves in order
+to mitigate the effect of exploited vulnerabilities, i. e. when attacker has achieved
+arbitrary code execution. exile.h makes it simpler for developers to use existing technologies such as Seccomp and Linux Namespaces. Those generally require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
 
-The following section offers small examples. Then the motivation is explained in more detail.
-Proper API documentation will be maintained in other files.
+The following section offers small examples. Then the motivation is explained in more detail. Proper API documentation will be maintained in other files.
 
 ## Quick demo
-This section quickly demonstrates the simplicity of the API. It serves as an overview to get
-a first impression.
+This section quickly demonstrates the simplicity of the API. It serves as an overview to get a first impression.
 
 system() is used to keep the example C code short. It also demonstrates that subprocesses are also subject to restrictions imposed by exile.h.
 
@@ -39,12 +39,12 @@ int main(void)
 }
 ```
 
-The assert() calls won't be fired, consistent with the policy.
+The assert() calls won't be fired, consistent with the policy that allows only reading
+from /home/user. We can write to /tmp/ though as it was specified in the policy.
 
-### System call policies / vows
+### vows(): pledge()-like API / System call policies
 exile.h allows specifying which syscalls are permitted or denied. In the following example,
-'ls' is never executed, as the specified "vows" do not allow the execve() system call. The
-process will be killed.
+'ls' is never executed, as the specified "vows" do not allow the execve() system call. The process will be killed.
 
 ```c
 #include "exile.h"
@@ -80,7 +80,7 @@ int main(void)
 Produces ```curl: (6) Could not resolve host: evil.tld```. For example, this is useful for subprocesses which do not need
 network access, but perform tasks such as parsing user-supplied file formats.
 
-### Isolation of single functions
+### Isolation of single functions (EXPERIMENTAL)
 Currently, work is being done that hopefully will allow isolation of individual function calls in a mostly pain-free manner.
 
 Consider the following C++ code:
@@ -127,23 +127,28 @@ We execute "cat()". The first call succeeds. In the second, we get an exception,
 the subprocess "cat()" was launched in violated the policy (missing "rpath" vow). 
 
 Naturally, there is a performance overhead. Certain challenges remain, such as the fact
-that being executed in a subprocess, we operate on copies, so handling references
+that being executed in a subproces, we operate on copies, so handling references
 is not something that has been given much thought. There is also the fact
-that clone()ing from threads opens a can of worms, particularly with locks. Hence, exile_launch()
-is best avoided in multi-threaded contexts.
+that clone()ing from threads opens a can of worms, particularly with locks. Hence, exile_launch() is best avoided in multi-threaded contexts.
 
 ## Status
 No release yet, experimental, API is unstable, builds will break on updates of this library.
 
 Currently, it's mainly evolving from the needs of my other projects which use exile.h.
 
+
+### Real-world usage
+  - looqs: https://github.com/quitesimpleorg/looqs
+  - qswiki: https://gitea.quitesimple.org/crtxcr/qswiki
+
+  
 ## Motivation and Background
 exile.h unlocks existing Linux mechanisms to facilitate isolation of processes from resources. Limiting the scope of what programs can do helps defending the rest of the system when a process gets under attacker's control (when classic mitigations such as ASLR etc. failed). To this end, OpenBSD has the pledge() and unveil() functions available. Those functions are helpful mitigation mechanisms, but such accessible ways are unfortunately not readily available on Linux. This is where exile.h steps in.
 
-Seccomp allows restricting the system calls available to a process and thus decrease the systems attack surface, but it generally is not easy to use. Requiring BPF filter instructions, you generally just can't make use of it right away. exile.h provides an API inspired by pledge(), building on top of seccomp. It also provides an interface to manually restrict the system calls that can be issued.
+Seccomp allows restricting the system calls available to a process and thus decrease the systems attack surface, but it generally is not easy to use. Requiring BPF filter instructions, you generally just can't make use of it right away without learning
+about BPF. exile.h provides an API inspired by pledge(), building on top of seccomp. It also provides an interface to manually restrict the system calls that can be issued.
 
-Traditional methods employed to restrict file system access, like different uids/gids, chroot, bind-mounts, namespaces etc. may require administrator intervention, are perhaps only suitable
-for daemons and not desktop applications, or are generally rather involved. As a positive example, Landlock since 5.13 is a vast improvement to limit file system access of processes. It also greatly simplifies exile.h' implementation of fs isolation.
+Traditional methods employed to restrict file system access, like different uids/gids, chroot, bind-mounts, namespaces etc. may require administrator intervention, are perhaps only suitable for daemons and not desktop applications, or are generally rather involved. As a positive example, Landlock since 5.13 is a vast improvement to limit file system access of processes. It also greatly simplifies exile.h' implementation of fs isolation.
 
 Abstracting those details may help developers bring sandboxing into their applications.
 
@@ -169,12 +174,18 @@ It's recommended to start with [README.usage.md] to get a feeling for exile.h.
 API-Documentation: [README.api.md]
 
 ## Limitations
-TODO:
- - seccomp must be kept up to date syscalls kernel
+Built upon kernel technologies, exile.h naturally inherits their limitations:
+
+  - New syscalls can be introduced by new kernel versions. exile.h must keep in sync, and users must keep the library up to date.
+  - seccomp has no deep argument inspection (yet), particularly new syscalls
+  cannot be reasonably filtered, such as clone3(), or io_uring.
+  - You can't know what syscalls libraries will issue. An update to existing
+  libraries may cause them to use different syscalls not allowed by a policy. However, using vows and keeping up to date with exile.h should cover that. 
+  - Landlock, currently, does not apply to syscalls such as stat().
+  
+TODO: 
  - ioctl does not know the fd, so checking values is kind of strange
  - redundancies: some things are handled by capabilties, other by seccomp or both
- - seccomp no deep argument inspection
- - landlock: stat() does not apply
  - no magic, be reasonable, devs should not  get sloppy, restrict IPC.
 
 ## Requirements
@@ -196,13 +207,8 @@ You can thank a Debian-specific kernel patch for that. Execute
 
 Note that newer releases should not cause this problem any longer, as [explained](https://www.debian.org/releases/bullseye/amd64/release-notes/ch-information.en.html#linux-user-namespaces) in the Debian release notes.
 
-### Real-world usage
-  - looqs: https://github.com/quitesimpleorg/looqs
-  - qswiki: https://gitea.quitesimple.org/crtxcr/qswiki
-
-Outdated:
-  - cgit sandboxed: https://gitea.quitesimple.org/crtxcr/cgitsb
-  - qpdfviewsb sandboxed (quick and dirty): https://gitea.quitesimple.org/crtxcr/qpdfviewsb
+### Why "vows"?
+pledge() cannot be properly implemented using seccomp. The "vow" concept here may look similiar, and it is, but it's not pledge(). 
 
 ### Other projects
  - [sandbox2](https://developers.google.com/code-sandboxing/sandbox2/)
