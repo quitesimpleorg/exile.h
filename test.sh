@@ -8,41 +8,41 @@ COUNT_SUCCEEDED=0
 COUNT_FAILED=0
 COUNT_SKIPPED=0
 
-function print_fail()
+print_fail()
 {
-	echo -e "${RED}$@${NC}" 1>&2
+	printf "${RED}$@${NC}\n" 1>&2
 }
 
-function print_success()
+print_success()
 {
-	echo -e "${GREEN}$@${NC}"
+	printf "${GREEN}$@${NC}\n"
 }
 
-function print_skipped()
+print_skipped()
 {
-	echo -e "${YELLOW}$@${NC}"
+	printf "${YELLOW}$@${NC}\n"
 }
 
-function runtest_fail()
+runtest_fail()
 {
 	print_fail "failed"
 	COUNT_FAILED=$(($COUNT_FAILED+1))
 }
 
-function runtest_success()
+runtest_success()
 {
 	print_success "ok"
 	COUNT_SUCCEEDED=$((COUNT_SUCCEEDED+1))
 }
 
-function runtest_skipped()
+runtest_skipped()
 {
 	print_skipped "skipped"
 	COUNT_SKIPPED=$((COUNT_SKIPPED+1))
 }
 
 
-function runtest()
+runtest()
 {
 	testbin="$1"
 	testname="$2"
@@ -52,7 +52,7 @@ function runtest()
 
 	echo -n "Running $testname... "
 	#exit $? to suppress shell message like "./test.sh: line 18: pid Bad system call"
-	(./$testbin "$testname" || exit $?) &>> "${test_log_file}"
+	(./$testbin "$testname" || exit $?) 2>&1 | tee 1>/dev/null -a "${test_log_file}"
 	ret=$?
 	SUCCESS="no"
 	if [ $ret -eq 0 ] ; then
