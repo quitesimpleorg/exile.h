@@ -942,6 +942,11 @@ static int enter_namespaces(int namespace_options)
 {
 	if(namespace_options & EXILE_UNSHARE_USER)
 	{
+		uid_t current_uid = getuid();
+		gid_t current_gid = getgid();
+
+		char buf[1024] = {0};
+
 		int ret = unshare(CLONE_NEWUSER);
 		if(ret == -1)
 		{
@@ -949,47 +954,51 @@ static int enter_namespaces(int namespace_options)
 			return ret;
 		}
 
-		uid_t current_uid = getuid();
-		gid_t current_gid = getgid();
+		int fd = open("/proc/self/setgroups", O_WRONLY);
+		if(fd == -1)
+		{
+			EXILE_LOG_ERROR("Failed to open /proc/self/setgroups for writing");
+			return -1;
+		}
+		int writesize = snprintf(buf, sizeof(buf), "deny");
+		int writeret = write(fd, buf, writesize);
+		if(writeret < 0 || writeret < writesize)
+		{
+			EXILE_LOG_ERROR("Failed to write to /proc/self/setgroups: %i (%s)\n", writeret, strerror(errno));
+			return -1;
+		}
+		close(fd);
 
-		FILE *fp = fopen("/proc/self/setgroups", "w");
-		if(fp == NULL)
+		fd = open("/proc/self/uid_map", O_WRONLY);
+		if(fd == -1)
 		{
-			EXILE_LOG_ERROR("fopen failed while trying to deny setgroups\n");
+			EXILE_LOG_ERROR("Failed to open /proc/self/uid_map for writing");
 			return -1;
 		}
-		if(fprintf(fp, "deny") < 0)
+		writesize = snprintf(buf, sizeof(buf), "0 %u 1\n", current_uid);
+		writeret = write(fd, buf, writesize);
+		if(writeret < 0 || writeret < writesize)
 		{
-			EXILE_LOG_ERROR("fprintf failed while trying to write setgroups\n");
+			EXILE_LOG_ERROR("Failed to write to /proc/self/uid_map: %i (%s)\n", writeret, strerror(errno));
 			return -1;
 		}
-		fclose(fp);
+		close(fd);
 
-		fp = fopen("/proc/self/uid_map", "w");
-		if(fp == NULL)
-		{
-			EXILE_LOG_ERROR("fopen failed while trying to write uid_map\n");
-			return -1;
-		}
-		if(fprintf(fp, "0 %i", current_uid) < 0)
-		{
-			EXILE_LOG_ERROR("fprintf failed while trying to write uid_map\n");
-			return -1;
-		}
-		fclose(fp);
 
-		fp = fopen("/proc/self/gid_map", "w");
-		if(fp == NULL)
+		fd = open("/proc/self/gid_map", O_WRONLY);
+		if(fd == -1)
 		{
-			EXILE_LOG_ERROR("fopen failed while trying to write gid_map\n");
+			EXILE_LOG_ERROR("Failed to open /proc/self/gid_map for writing");
 			return -1;
 		}
-		if(fprintf(fp, "0 %i", current_gid) < 0)
+		writesize = snprintf(buf, sizeof(buf), "0 %u 1\n", current_gid);
+		writeret = write(fd, buf, writesize);
+		if(writeret < 0 || writeret < writesize)
 		{
-			EXILE_LOG_ERROR("fprintf failed while trying to write gid_map\n");
+			EXILE_LOG_ERROR("Failed to write to /proc/self/gid_map: %i (%s)\n", writeret, strerror(errno));
 			return -1;
 		}
-		fclose(fp);
+		close(fd);
 	}
 
 	if(namespace_options & EXILE_UNSHARE_MOUNT)

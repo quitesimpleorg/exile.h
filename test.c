@@ -661,6 +661,104 @@ int test_clone3_nosys()
 	return 0;
 }
 
+int do_test_nsuidmap(const char *path,  const char *firstfield, const char *secondfield, const char *thirdfield)
+{
+	char *line = NULL;
+	size_t n = 0;
+	FILE *fp = fopen(path, "r");
+
+	int ret = getdelim(&line, &n, ' ', fp);
+	while(ret != -1 && strlen(line) == 1 && *line == ' ')
+		ret = getdelim(&line, &n, ' ', fp);
+	if(ret == -1)
+	{
+		LOG("getdelim() failed to read a line from %s\n", path);
+		return 1;
+	}
+	line[ret-1] = '\0';
+	if(strcmp(line, firstfield) != 0)
+	{
+		LOG("Invalid value for first entry in map: Expected: %s, was: %s\n", firstfield, line);
+		return 1;
+	}
+
+	ret = getdelim(&line, &n, ' ', fp);
+	while(ret != -1 && strlen(line) == 1 && *line == ' ')
+		ret = getdelim(&line, &n, ' ', fp);
+	if(ret == -1)
+	{
+		LOG("getdelim() failed to read a line from map\n");
+		return 1;
+	}
+	line[ret-1] = '\0';
+
+	if(strcmp(line, secondfield) != 0)
+	{
+		LOG("Invalid value for second entry in map: Expected: %s, was: %s\n", secondfield, line);
+		return 1;
+	}
+
+
+	ret = getdelim(&line, &n, ' ', fp);
+	while(ret != -1 && strlen(line) == 1 && *line == ' ')
+		ret = getdelim(&line, &n, ' ', fp);
+	if(ret == -1)
+	{
+		LOG("getdelim() failed to read a line from uid_map\n");
+		return 1;
+	}
+	line[ret-1] = '\0';
+	if(strcmp(line, thirdfield) != 0)
+	{
+		LOG("Invalid value for second entry in map: Expected: %s, was: %s\n", thirdfield, line);
+		return 1;
+	}
+
+	fclose(fp);
+	return 0;
+}
+
+int test_unshare_user()
+{
+	char uidstr[64];
+	snprintf(uidstr, sizeof(uidstr), "%u", getuid());
+
+	char gidstr[64];
+	snprintf(gidstr, sizeof(gidstr), "%u", getgid());
+
+	struct exile_policy *policy = exile_init_policy();
+	policy->namespace_options = EXILE_UNSHARE_USER;
+	xexile_enable_policy(policy);
+
+	if(do_test_nsuidmap("/proc/self/uid_map", "0", uidstr, "1") != 0)
+	{
+		LOG("/proc/self/uid_map failed\n");
+		return 1;
+	}
+
+	if(do_test_nsuidmap("/proc/self/gid_map", "0", gidstr, "1") != 0)
+	{
+		LOG("/proc/self/gid_map failed\n");
+		return 1;
+	}
+
+	FILE *fp = fopen("/proc/self/setgroups", "r");
+
+	char buffer[4096] = { 0 };
+	fread(buffer, sizeof(buffer), 1, fp);
+	fclose(fp);
+
+	if(strcmp(buffer, "deny\n") != 0)
+	{
+		LOG("/proc/self/setgroups does not contain 'deny'\n");
+		return 1;
+	}
+
+	return 0;
+
+
+}
+
 struct dispatcher
 {
 	char *name;
@@ -689,6 +787,8 @@ struct dispatcher dispatchers[] = {
 	{ "launch-get", &test_launch_get},
 	{ "vow_from_str", &test_vows_from_str},
 	{ "clone3_nosys", &test_clone3_nosys},
+	{ "unshare-user", &test_unshare_user},
+
 };
 
 int main(int argc, char *argv[])
