@@ -1888,13 +1888,6 @@ char *exile_launch_get(struct exile_launch_params *launch_params, size_t *n)
 		}
 	}
 	fclose(stream);
-	int seek = fseek(stream, 0, SEEK_SET);
-	if(seek == -1)
-	{
-		EXILE_LOG_ERROR("fseek failed\n");
-		close(launch_result.read_fd);
-		return NULL;
-	}
 	close(launch_result.read_fd);
 	*n = size;
 	return result;
