@@ -52,7 +52,8 @@ runtest()
 
 	echo -n "Running $testname... "
 	#exit $? to suppress shell message like "./test.sh: line 18: pid Bad system call"
-	(./$testbin "$testname" || exit $?) 2>&1 | tee 1>/dev/null -a "${test_log_file}"
+	(./$testbin "$testname" || exit $?) >> "${test_log_file}" 2>&1
+
 	ret=$?
 	SUCCESS="no"
 	if [ $ret -eq 0 ] ; then
