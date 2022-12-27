@@ -618,9 +618,9 @@ int test_launch_get()
 	size_t n = 0;
 	char *content = exile_launch_get(&params, &n);
 	unsigned int len = strlen(LAUNCH_GET_TEST_STR);
-	if(n != strlen(LAUNCH_GET_TEST_STR))
+	if(n != len)
 	{
-		LOG("Lenght does does not match: %lu vs %u\n", n, len);
+		LOG("Lenght does not match: %lu vs %u\n", n, len);
 		return 1;
 	}
 	if(strcmp(content, LAUNCH_GET_TEST_STR) != 0)
