@@ -755,8 +755,50 @@ int test_unshare_user()
 	}
 
 	return 0;
+}
 
+int test_unshare_user_own_uid()
+{
+	uid_t uid = getuid();
+	gid_t gid = getgid();
 
+	char uidstr[64];
+	snprintf(uidstr, sizeof(uidstr), "%u", uid);
+
+	char gidstr[64];
+	snprintf(gidstr, sizeof(gidstr), "%u", gid);
+
+	struct exile_policy *policy = exile_init_policy();
+	policy->namespace_options = EXILE_UNSHARE_USER;
+	policy->namespace_gid = gid;
+	policy->namespace_uid = uid;
+	xexile_enable_policy(policy);
+
+	if(do_test_nsuidmap("/proc/self/uid_map", uidstr, uidstr, "1") != 0)
+	{
+		LOG("/proc/self/uid_map failed\n");
+		return 1;
+	}
+
+	if(do_test_nsuidmap("/proc/self/gid_map", gidstr, gidstr, "1") != 0)
+	{
+		LOG("/proc/self/gid_map failed\n");
+		return 1;
+	}
+
+	FILE *fp = fopen("/proc/self/setgroups", "r");
+
+	char buffer[4096] = { 0 };
+	fread(buffer, sizeof(buffer), 1, fp);
+	fclose(fp);
+
+	if(strcmp(buffer, "deny\n") != 0)
+	{
+		LOG("/proc/self/setgroups does not contain 'deny'\n");
+		return 1;
+	}
+
+	return 0;
 }
 
 struct dispatcher
@@ -788,6 +830,8 @@ struct dispatcher dispatchers[] = {
 	{ "vow_from_str", &test_vows_from_str},
 	{ "clone3_nosys", &test_clone3_nosys},
 	{ "unshare-user", &test_unshare_user},
+	{ "unshare-user-own-uid", &test_unshare_user_own_uid},
+
 
 };
 

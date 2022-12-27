@@ -625,6 +625,8 @@ struct exile_policy *exile_init_policy()
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
 	result->namespace_options = EXILE_UNSHARE_MOUNT | EXILE_UNSHARE_USER;
+	result->namespace_uid = 0;
+	result->namespace_gid = 0;
 	return result;
 }
 
@@ -938,7 +940,7 @@ void exile_free_policy(struct exile_policy *ctxt)
 }
 
 /* Enters the specified namespaces */
-static int enter_namespaces(int namespace_options)
+static int enter_namespaces(int namespace_options, uid_t namespace_uid, gid_t namespace_gid)
 {
 	if(namespace_options & EXILE_UNSHARE_USER)
 	{
@@ -975,7 +977,7 @@ static int enter_namespaces(int namespace_options)
 			EXILE_LOG_ERROR("Failed to open /proc/self/uid_map for writing");
 			return -1;
 		}
-		writesize = snprintf(buf, sizeof(buf), "0 %u 1\n", current_uid);
+		writesize = snprintf(buf, sizeof(buf), "%u %u 1\n", namespace_uid, current_uid);
 		writeret = write(fd, buf, writesize);
 		if(writeret < 0 || writeret < writesize)
 		{
@@ -991,7 +993,7 @@ static int enter_namespaces(int namespace_options)
 			EXILE_LOG_ERROR("Failed to open /proc/self/gid_map for writing");
 			return -1;
 		}
-		writesize = snprintf(buf, sizeof(buf), "0 %u 1\n", current_gid);
+		writesize = snprintf(buf, sizeof(buf), "%u %u 1\n", namespace_gid, current_gid);
 		writeret = write(fd, buf, writesize);
 		if(writeret < 0 || writeret < writesize)
 		{
@@ -1541,7 +1543,7 @@ int exile_enable_policy(struct exile_policy *policy)
 		close_file_fds();
 	}
 
-	if(enter_namespaces(policy->namespace_options) < 0)
+	if(enter_namespaces(policy->namespace_options, policy->namespace_uid, policy->namespace_gid) < 0)
 	{
 		EXILE_LOG_ERROR("Error while trying to enter namespaces\n");
 		return -1;

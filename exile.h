@@ -375,6 +375,9 @@ struct exile_policy
 
 	uint64_t vow_promises;
 
+	uid_t namespace_uid;
+	gid_t namespace_gid;
+
 	/* Do not manually add policies here, use exile_append_path_policies() */
 	struct exile_path_policy *path_policies;
 	struct exile_path_policy **path_policies_tail;
