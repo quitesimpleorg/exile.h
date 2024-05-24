@@ -1307,7 +1307,7 @@ static unsigned int exile_flags_to_landlock(unsigned int flags, int statmode)
 static int landlock_prepare_ruleset(struct exile_path_policy *policies)
 {
 	int ruleset_fd = -1;
-	struct landlock_ruleset_attr ruleset_attr;
+	struct landlock_ruleset_attr ruleset_attr = {0};
 	/* We here want the maximum possible ruleset, so set the var to the max possible bitmask.
 	   Stolen/Adapted from: [linux src]/security/landlock/limits.h
 	*/
@@ -1322,7 +1322,7 @@ static int landlock_prepare_ruleset(struct exile_path_policy *policies)
 	struct exile_path_policy *policy = policies;
 	while(policy != NULL)
 	{
-		struct landlock_path_beneath_attr path_beneath;
+		struct landlock_path_beneath_attr path_beneath = {0};
 		path_beneath.parent_fd = open(policy->path, O_PATH | O_CLOEXEC);
 		if(path_beneath.parent_fd < 0)
 		{
