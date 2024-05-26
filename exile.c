@@ -1229,6 +1229,9 @@ static unsigned int exile_flags_to_landlock(unsigned int flags, int statmode)
 	if(flags & EXILE_FS_ALLOW_ALL_WRITE)
 	{
 		result |= LANDLOCK_ACCESS_FS_WRITE_FILE;
+#ifdef LANDLOCK_ACCESS_FS_TRUNCATE
+		result |= LANDLOCK_ACCESS_FS_TRUNCATE;
+#endif
 		if(S_ISDIR(statmode))
 		{
 			result |= LANDLOCK_ACCESS_FS_REMOVE_DIR;
@@ -1238,6 +1241,9 @@ static unsigned int exile_flags_to_landlock(unsigned int flags, int statmode)
 			result |= LANDLOCK_ACCESS_FS_MAKE_REG;
 			result |= LANDLOCK_ACCESS_FS_MAKE_SOCK;
 			result |= LANDLOCK_ACCESS_FS_MAKE_SYM;
+#ifdef LANDLOCK_ACCESS_FS_REFER
+			result |= LANDLOCK_ACCESS_FS_REFER;
+#endif
 		}
 	}
 	if(flags & EXILE_FS_ALLOW_EXEC)
@@ -1304,15 +1310,42 @@ static unsigned int exile_flags_to_landlock(unsigned int flags, int statmode)
 	return result;
 }
 
+/* Sets maximum values for the handled access fs... */
+static int landlock_set_max_handled_access(struct landlock_ruleset_attr *ruleset)
+{
+	int abi = landlock_create_ruleset(NULL, 0,
+                                  LANDLOCK_CREATE_RULESET_VERSION);
+	if(abi < 0)
+	{
+		EXILE_LOG_ERROR("Can't determine landlock ABI version\n");
+		return -1;
+	}
+	ruleset->handled_access_net = 0;
+	if(abi == 1)
+	{
+		ruleset->handled_access_fs = ((LANDLOCK_ACCESS_FS_MAKE_SYM << 1) - 1);
+	}
+	if(abi == 2)
+	{
+		ruleset->handled_access_fs = ((LANDLOCK_ACCESS_FS_REFER << 1) - 1);
+	}
+	if(abi >= 3)
+	{
+		ruleset->handled_access_fs = ((LANDLOCK_ACCESS_FS_TRUNCATE << 1) - 1);
+		/* TODO: think about net */
+	}
+	return 0;
+
+}
+
 static int landlock_prepare_ruleset(struct exile_path_policy *policies)
 {
 	int ruleset_fd = -1;
 	struct landlock_ruleset_attr ruleset_attr = {0};
-	/* We here want the maximum possible ruleset, so set the var to the max possible bitmask.
-	   Stolen/Adapted from: [linux src]/security/landlock/limits.h
-	*/
-	ruleset_attr.handled_access_fs = ((LANDLOCK_ACCESS_FS_MAKE_SYM << 1) - 1);
-
+	if(landlock_set_max_handled_access(&ruleset_attr) != 0)
+	{
+		return -1;
+	}
 	ruleset_fd = landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
 	if (ruleset_fd < 0)
 	{
@@ -1339,6 +1372,13 @@ static int landlock_prepare_ruleset(struct exile_path_policy *policies)
 			return ret;
 		}
 		path_beneath.allowed_access = exile_flags_to_landlock(policy->policy, sb.st_mode);
+
+		/* Required, so the .allowed_access fits .handled_access_fs of the ruleset.
+		 * Needed for backwards compatibility, e. g. new binary compiled with new headers,
+		 executed on a kernel with an older ABI version which does not have some constant defined...
+		 */
+		path_beneath.allowed_access &= ruleset_attr.handled_access_fs;
+
 		ret = landlock_add_rule(ruleset_fd, LANDLOCK_RULE_PATH_BENEATH, &path_beneath, 0);
 		if(ret)
 		{
