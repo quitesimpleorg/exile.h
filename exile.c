@@ -1532,6 +1532,30 @@ static int enable_no_fs(struct exile_policy *policy)
 {
 		close_file_fds();
 
+		if(exile_landlock_is_available())
+		{
+			struct landlock_ruleset_attr ruleset_attr = {0};
+			if(landlock_set_max_handled_access(&ruleset_attr) != 0)
+			{
+				return -1;
+			}
+			int ruleset_fd = landlock_create_ruleset(&ruleset_attr, sizeof(ruleset_attr), 0);
+			if (ruleset_fd < 0)
+			{
+				EXILE_LOG_ERROR("Failed to create landlock ruleset\n");
+				return -1;
+			}
+			int ret = landlock_restrict_self(ruleset_fd, 0);
+			if(ret != 0)
+			{
+				EXILE_LOG_ERROR("Failed to enable no_fs with landlock: %s\n", strerror(errno));
+				close(ruleset_fd);
+				return -1;
+			}
+			close(ret);
+			return 0;
+		}
+
 		if(chdir("/proc/self/fdinfo") != 0)
 		{
 			EXILE_LOG_ERROR("Failed to change to safe directory: %s\n", strerror(errno));
@@ -1666,14 +1690,6 @@ int exile_enable_policy(struct exile_policy *policy)
 	}
 #endif
 
-	if(policy->no_fs)
-	{
-		if(enable_no_fs(policy) != 0)
-		{
-			EXILE_LOG_ERROR("Failed to take away filesystem access of process\n");
-			return -1;
-		}
-	}
 
 	if(policy->no_new_fds)
 	{
@@ -1681,15 +1697,6 @@ int exile_enable_policy(struct exile_policy *policy)
 		if (setrlimit(RLIMIT_NOFILE, &nofile) == -1)
 		{
 			EXILE_LOG_ERROR("setrlimit: Failed to set rlimit: %s\n", strerror(errno));
-			return -1;
-		}
-	}
-
-	if(policy->drop_caps)
-	{
-		if(drop_caps() < 0)
-		{
-			EXILE_LOG_ERROR("failed to drop capabilities\n");
 			return -1;
 		}
 	}
@@ -1708,6 +1715,15 @@ int exile_enable_policy(struct exile_policy *policy)
 		if(prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1)
 		{
 			EXILE_LOG_ERROR("prctl: PR_SET_NO_NEW_PRIVS failed: %s\n", strerror(errno));
+			return -1;
+		}
+	}
+
+	if(policy->no_fs)
+	{
+		if(enable_no_fs(policy) != 0)
+		{
+			EXILE_LOG_ERROR("Failed to take away filesystem access of process\n");
 			return -1;
 		}
 	}
@@ -1732,12 +1748,19 @@ int exile_enable_policy(struct exile_policy *policy)
 		}
 	}
 
+	if(policy->drop_caps)
+	{
+		if(drop_caps() < 0)
+		{
+			EXILE_LOG_ERROR("failed to drop capabilities\n");
+			return -1;
+		}
+	}
+
 	if(policy->syscall_policies != NULL)
 	{
 		return exile_enable_syscall_policy(policy);
 	}
-
-
 	return 0;
 }
 
