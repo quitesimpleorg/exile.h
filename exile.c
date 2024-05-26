@@ -959,7 +959,7 @@ static int enter_namespaces(int namespace_options, uid_t namespace_uid, gid_t na
 		int fd = open("/proc/self/setgroups", O_WRONLY);
 		if(fd == -1)
 		{
-			EXILE_LOG_ERROR("Failed to open /proc/self/setgroups for writing");
+			EXILE_LOG_ERROR("Failed to open /proc/self/setgroups for writing\n");
 			return -1;
 		}
 		int writesize = snprintf(buf, sizeof(buf), "deny");
@@ -974,7 +974,7 @@ static int enter_namespaces(int namespace_options, uid_t namespace_uid, gid_t na
 		fd = open("/proc/self/uid_map", O_WRONLY);
 		if(fd == -1)
 		{
-			EXILE_LOG_ERROR("Failed to open /proc/self/uid_map for writing");
+			EXILE_LOG_ERROR("Failed to open /proc/self/uid_map for writing\n");
 			return -1;
 		}
 		writesize = snprintf(buf, sizeof(buf), "%u %u 1\n", namespace_uid, current_uid);
@@ -990,7 +990,7 @@ static int enter_namespaces(int namespace_options, uid_t namespace_uid, gid_t na
 		fd = open("/proc/self/gid_map", O_WRONLY);
 		if(fd == -1)
 		{
-			EXILE_LOG_ERROR("Failed to open /proc/self/gid_map for writing");
+			EXILE_LOG_ERROR("Failed to open /proc/self/gid_map for writing\n");
 			return -1;
 		}
 		writesize = snprintf(buf, sizeof(buf), "%u %u 1\n", namespace_gid, current_gid);
