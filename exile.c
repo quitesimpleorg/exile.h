@@ -621,10 +621,10 @@ struct exile_policy *exile_init_policy()
 	{
 		return NULL;
 	}
-	result->drop_caps = 1;
+	result->drop_caps = 0;
 	result->not_dumpable = 1;
 	result->no_new_privs = 1;
-	result->namespace_options = EXILE_UNSHARE_MOUNT | EXILE_UNSHARE_USER;
+	result->namespace_options = EXILE_UNSHARE_AUTOMATIC;
 	result->namespace_uid = 0;
 	result->namespace_gid = 0;
 	return result;
