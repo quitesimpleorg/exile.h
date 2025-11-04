@@ -1,6 +1,7 @@
 #include "exile.hpp"
 #include "assert.h"
 #include <map>
+#include <algorithm>
 
 std::string sandboxed_reverse(std::string str)
 {
@@ -35,26 +36,34 @@ int test_exile_launch_stdstring()
 
 struct not_trivially_copyable
 {
-public:
+  public:
 	std::string somecontent;
 };
 
 int test_exile_launch_serializer()
 {
-	static_assert(! std::is_trivially_copyable_v<not_trivially_copyable>);
+	static_assert(!std::is_trivially_copyable_v<not_trivially_copyable>);
 
-	auto serializer = [](const not_trivially_copyable &obj, char *buf, size_t n){
+	auto serializer = [](const not_trivially_copyable &obj, char *buf, size_t n)
+	{
 		serialize_stdstring<std::string>(obj.somecontent, buf, n);
 		return obj.somecontent.size();
 	};
 
-	auto deserializer = [](const char *buffer, size_t n) {
+	auto deserializer = [](const char *buffer, size_t n)
+	{
 		not_trivially_copyable obj;
 		obj.somecontent = deserialize_stdstring<std::string>(buffer, n);
 		return obj;
 	};
 
-	not_trivially_copyable result = exile_launch<not_trivially_copyable>(exile_init_policy(), serializer, deserializer, []() {not_trivially_copyable obj; obj.somecontent = "Just something"; return obj;});
+	not_trivially_copyable result = exile_launch<not_trivially_copyable>(exile_init_policy(), serializer, deserializer,
+																		 []()
+																		 {
+																			 not_trivially_copyable obj;
+																			 obj.somecontent = "Just something";
+																			 return obj;
+																		 });
 
 	assert(result.somecontent == "Just something");
 	return 0;
@@ -68,9 +77,9 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	std::map<std::string, int (*)()> map = {
-		{ "launch-trivial-cpp", &test_exile_launch_trivial} ,
-		{ "launch-stdstring-cpp", &test_exile_launch_stdstring },
-		{ "launch-serializer-cpp", &test_exile_launch_serializer },
+		{"launch-trivial-cpp", &test_exile_launch_trivial},
+		{"launch-stdstring-cpp", &test_exile_launch_stdstring},
+		{"launch-serializer-cpp", &test_exile_launch_serializer},
 	};
 
 	std::string test = argv[1];
