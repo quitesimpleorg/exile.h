@@ -1,7 +1,6 @@
 # exile.h
-`exile.h` provides an API for processes on Linux to easily isolate themselves in order
-to mitigate the effect of exploited vulnerabilities, i. e. when attacker has achieved
-arbitrary code execution. exile.h makes it simpler for developers to use existing technologies such as Seccomp and Linux Namespaces. Those generally require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
+`exile.h` provides an API for processes on Linux to isolate themselves.
+exile.h makes it easier for developers to use existing technologies such as Seccomp and Linux Namespaces. Those generally require knowledge of details and are not trivial for developers to employ, which prevents a more widespread adoption.
 
 The following section offers small examples. Then the motivation is explained in more detail. Proper API documentation will be maintained in other files.
 
@@ -136,6 +135,8 @@ No release yet, experimental, API is unstable, builds will break on updates of t
 
 Currently, it's mainly evolving from the needs of my other projects which use exile.h.
 
+Furthermore, distro specific decisions make things more complicated for some features of exile.h
+
 
 ### Real-world usage
   - looqs: https://github.com/quitesimpleorg/looqs
@@ -199,13 +200,25 @@ While mostly transparent to users of this API, kernel >= 5.13 is required to tak
 
 ### Does the process need to be privileged to utilize the library?
 
-No.
+No. But see below.
 
 ### It doesn't work on my Debian version!
 You can thank a Debian-specific kernel patch for that. Execute
 `echo 1 > /proc/sys/kernel/unprivileged_userns_clone` to disable that patch for now.
 
 Note that newer releases should not cause this problem any longer, as [explained](https://www.debian.org/releases/bullseye/amd64/release-notes/ch-information.en.html#linux-user-namespaces) in the Debian release notes.
+
+### It doesn't work on Ubuntu 24.04!
+Since Ubuntu 24.04, apparmor disallows unprivileged user namespaces unless an application is whitelisted.
+As unpriviled user namespaces are an double-edges sword on Linux, this move by Canonical is understandable.
+That said, it is unfortunate for exile.h, since it nows requires shipping apparmor profiles. It also
+deviates from upstream Linux...
+
+However, the situation is not that bad and better than when exile.h was started. "vows" are independent of user namespaces. With landlock,
+filesystems isolation can be achieved without user namespaces.
+
+
+
 
 ### Why "vows"?
 pledge() cannot be properly implemented using seccomp. The "vow" concept here may look similiar, and it is, but it's not pledge(). 
