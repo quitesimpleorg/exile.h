@@ -1562,7 +1562,7 @@ static int enable_no_fs(struct exile_policy *policy)
 				close(ruleset_fd);
 				return -1;
 			}
-			close(ret);
+			close(ruleset_fd);
 			return 0;
 		}
 
