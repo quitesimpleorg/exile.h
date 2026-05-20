@@ -1500,15 +1500,25 @@ static int check_policy_sanity(struct exile_policy *policy)
 static void close_file_fds()
 {
 	long max_files = sysconf(_SC_OPEN_MAX);
+	if(max_files == -1)
+	{
+		EXILE_LOG_ERROR("sysconf(_SC_OPEN_MAX) failed: %s\n", strerror(errno));
+		abort();
+
+	}
 	for(long i = 3; i <= max_files; i++)
 	{
 		struct stat statbuf;
-		int fd = (int) max_files;
-		int result = fstat(i, &statbuf);
-		if(result == -1 && errno != EBADF && errno != EACCES)
+		int fd = (int) i;
+		int result = fstat(fd, &statbuf);
+		if(result == -1)
 		{
-			EXILE_LOG_ERROR("Could not fstat %i: %s\n", fd, strerror(errno));
-			abort();
+			if(errno != EBADF && errno != EACCES)
+			{
+				EXILE_LOG_ERROR("Could not fstat %i: %s\n", fd, strerror(errno));
+				abort();
+			}
+			continue;
 		}
 		int type = statbuf.st_mode & S_IFMT;
 		if(type != S_IFIFO && type != S_IFSOCK)
